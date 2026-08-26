@@ -38,7 +38,7 @@ class XrayRunner(private val context: Context) {
 
         val xrayFile = File(xrayDir, "xray")
 
-        if (!xrayFile.exists()) {
+        if (!xrayFile.exists() || xrayFile.length() < 100000) {
             Log.i("XrayRunner", "Extracting xray binary from gzip...")
             try {
                 // Extract from compressed .gz asset
@@ -47,11 +47,27 @@ class XrayRunner(private val context: Context) {
                 copyStream(gzInput, xrayFile)
                 gzInput.close()
                 asset.close()
+                
+                // Verify extracted file
+                if (xrayFile.length() < 100000) {
+                    throw RuntimeException("Extracted xray binary too small: ${xrayFile.length()} bytes")
+                }
+                
                 xrayFile.setExecutable(true, false)
                 Log.i("XrayRunner", "Xray binary extracted: ${xrayFile.absolutePath}, size=${xrayFile.length()}")
             } catch (e: Exception) {
                 Log.e("XrayRunner", "Failed to extract xray: ${e.message}")
-                throw e
+                // Try alternative: maybe it's not gzipped, try direct copy
+                try {
+                    val asset = context.assets.open("xray.gz")
+                    copyStream(asset, xrayFile)
+                    asset.close()
+                    xrayFile.setExecutable(true, false)
+                    Log.i("XrayRunner", "Xray binary copied directly: size=${xrayFile.length()}")
+                } catch (e2: Exception) {
+                    Log.e("XrayRunner", "Direct copy also failed: ${e2.message}")
+                    throw RuntimeException("Cannot extract xray binary: ${e.message} / ${e2.message}")
+                }
             }
         }
 
@@ -346,8 +362,13 @@ class XrayRunner(private val context: Context) {
                     } catch (_: Exception) {}
                 }
 
-                // Wait a bit for startup
-                Thread.sleep(2000)
+                // Wait a bit for startup (max 10 seconds)
+                var waitMs = 0
+                while (!started && waitMs < 10000) {
+                    Thread.sleep(200)
+                    waitMs += 200
+                    if (xrayProcess?.isAlive != true) break
+                }
 
                 if (!started) {
                     // Check if process is alive
@@ -357,7 +378,15 @@ class XrayRunner(private val context: Context) {
                         callback.onConnected(localSocksPort)
                     } else {
                         val exitCode = xrayProcess?.exitValue() ?: -1
-                        callback.onError("Xray فشل في البدء · كود: $exitCode")
+                        // Read error output
+                        var errorMsg = ""
+                        try {
+                            val errStream = xrayProcess?.errorStream
+                            if (errStream != null) {
+                                errorMsg = errStream.bufferedReader().readText().take(500)
+                            }
+                        } catch (_: Exception) {}
+                        callback.onError("Xray فشل · كود: $exitCode${if (errorMsg.isNotEmpty()) " · $errorMsg" else ""}")
                     }
                 }
 

@@ -682,7 +682,13 @@ setInterval(function(){
 
 // ============ VPN TOGGLE ============
 function toggleVPN(){
-  if(state.connecting)return;
+  if(state.connecting){
+    // Cancel connecting
+    if(typeof Android!=='undefined'&&Android.disconnectVpn){Android.disconnectVpn();}
+    onVpnDisconnected();
+    addLog('warn','تم إلغاء الاتصال');
+    return;
+  }
   if(!state.connected){
     if(activeConfigId===null||!configs.length){
       if(typeof showToast==='function')showToast('استورد وفعّل كونفيغ .dgvpn أولاً');
