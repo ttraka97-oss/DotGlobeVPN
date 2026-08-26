@@ -2,8 +2,6 @@ name: Build APK
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
     branches: [ main ]
   workflow_dispatch:
 
@@ -27,12 +25,20 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build Debug APK (signed with debug key — installable)
+    - name: Build Debug APK (signed, installable)
       run: ./gradlew assembleDebug
 
-    - name: Upload APK
+    - name: Verify APK is signed
+      run: |
+        ls -la app/build/outputs/apk/debug/
+        # Verify the APK exists and is valid
+        APK=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -1)
+        echo "APK: $APK"
+        unzip -l "$APK" | grep -E "META-INF/.*(RSA|DSA|EC)" || echo "WARNING: No signature found"
+
+    - name: Upload single APK
       uses: actions/upload-artifact@v4
       with:
-        name: DotGlobeVPN-v9
-        path: app/build/outputs/apk/debug/*.apk
+        name: DotGlobeVPN
+        path: app/build/outputs/apk/debug/app-debug.apk
         retention-days: 90

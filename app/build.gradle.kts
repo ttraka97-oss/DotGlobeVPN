@@ -18,6 +18,7 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
+            isDebuggable = true
         }
         release {
             isMinifyEnabled = true
@@ -27,15 +28,12 @@ android {
         }
     }
 
-    // Anti-tamper: split per ABI to reduce size + add dex security
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a", "x86_64")
-            isUniversalApk = true
+    signingConfigs {
+        getByName("debug") {
+            // Use default debug keystore
         }
     }
+
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
