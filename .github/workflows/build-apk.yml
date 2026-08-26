@@ -27,18 +27,12 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build Release APK (with ProGuard protection)
-      run: ./gradlew assembleRelease
-
-    - name: Build Debug APK (fallback)
-      if: failure()
+    - name: Build Debug APK (signed with debug key — installable)
       run: ./gradlew assembleDebug
 
-    - name: Upload Release APK
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: DotGlobeVPN-v9-protected
-        path: |
-          app/build/outputs/apk/release/*.apk
-          app/build/outputs/apk/debug/*.apk
+        name: DotGlobeVPN-v9
+        path: app/build/outputs/apk/debug/*.apk
         retention-days: 90
