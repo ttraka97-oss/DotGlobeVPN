@@ -179,11 +179,11 @@ class V2RayTunnel {
         java.security.SecureRandom().nextBytes(auth)
 
         // Send auth + length + body (simplified — real VMess uses AES-128-GCM)
-        socket.outputStream.write(auth)
-        socket.outputStream.write((reqBody.size shr 8).toByte())
-        socket.outputStream.write(reqBody.size.toByte())
-        socket.outputStream.write(reqBody)
-        socket.outputStream.flush()
+        val outStream = socket.outputStream
+        outStream.write(auth)
+        outStream.write(byteArrayOf((reqBody.size shr 8).toByte(), reqBody.size.toByte()))
+        outStream.write(reqBody)
+        outStream.flush()
     }
 
     private fun handleV2RayClient(client: Socket, sslSocket: SSLSocket, callback: TunnelCallback) {
