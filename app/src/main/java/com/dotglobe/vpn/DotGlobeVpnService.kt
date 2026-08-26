@@ -168,7 +168,9 @@ class DotGlobeVpnService : VpnService() {
 
                 // SOCKS5 handshake
                 val handshake = ByteBuffer.allocate(3)
-                handshake.put(5, 0.toByte(), 0)
+                handshake.put(5.toByte())
+                handshake.put(0.toByte())
+                handshake.put(0.toByte())
                 handshake.flip()
                 socket.write(handshake)
 
