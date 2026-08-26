@@ -22,7 +22,6 @@
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security"
         android:requestLegacyExternalStorage="false"
-        android:debuggable="false"
         android:extractNativeLibs="true">
 
         <activity
