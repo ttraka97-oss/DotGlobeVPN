@@ -10,9 +10,10 @@ import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
 
     private lateinit var webView: WebView
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
@@ -58,7 +59,6 @@ class MainActivity : Activity() {
 
         webView.loadUrl("file:///android_asset/index.html")
 
-        // Handle .dgvpn file opened from outside
         handleIntent(intent)
     }
 
@@ -66,7 +66,7 @@ class MainActivity : Activity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val results: Array<Uri>? = if (result.resultCode == RESULT_OK) {
-            result.data?.data?.let { arrayOf(it) }
+            result.data?.data?.let { uri -> arrayOf(uri) }
         } else {
             null
         }
@@ -102,10 +102,12 @@ class MainActivity : Activity() {
         return "'$escaped'"
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView.canGoBack()) {
             webView.goBack()
         } else {
+            @Suppress("DEPRECATION")
             super.onBackPressed()
         }
     }
