@@ -4,7 +4,9 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.net.VpnService
 import android.os.Bundle
+import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -17,6 +19,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var webView: WebView
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private var pendingConfigContent: String? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,7 +61,6 @@ class MainActivity : ComponentActivity() {
         }
 
         webView.loadUrl("file:///android_asset/index.html")
-
         handleIntent(intent)
     }
 
@@ -72,6 +74,22 @@ class MainActivity : ComponentActivity() {
         }
         filePathCallback?.onReceiveValue(results)
         filePathCallback = null
+    }
+
+    private val vpnPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            // VPN permission granted, connect
+            pendingConfigContent?.let { startVpnService(it) }
+            pendingConfigContent = null
+        } else {
+            webView.post {
+                webView.evaluateJavascript(
+                    "if(typeof onVpnPermission === 'function'){onVpnPermission(false);}", null
+                )
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -102,6 +120,37 @@ class MainActivity : ComponentActivity() {
         return "'$escaped'"
     }
 
+    private fun startVpnService(configJson: String) {
+        try {
+            val intent = Intent(this, DotGlobeVpnService::class.java).apply {
+                action = DotGlobeVpnService.ACTION_CONNECT
+                putExtra(DotGlobeVpnService.EXTRA_CONFIG, configJson)
+            }
+            startService(intent)
+
+            webView.post {
+                webView.evaluateJavascript(
+                    "if(typeof onVpnConnected === 'function'){onVpnConnected();}", null
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("DotGlobeVPN", "Failed to start VPN: ${e.message}")
+        }
+    }
+
+    private fun stopVpnService() {
+        val intent = Intent(this, DotGlobeVpnService::class.java).apply {
+            action = DotGlobeVpnService.ACTION_DISCONNECT
+        }
+        startService(intent)
+
+        webView.post {
+            webView.evaluateJavascript(
+                "if(typeof onVpnDisconnected === 'function'){onVpnDisconnected();}", null
+            )
+        }
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView.canGoBack()) {
@@ -111,17 +160,53 @@ class MainActivity : ComponentActivity() {
             super.onBackPressed()
         }
     }
-}
 
-class WebAppInterface(private val activity: Activity) {
-    @JavascriptInterface
-    fun showToast(message: String) {
-        android.widget.Toast.makeText(activity, message, android.widget.Toast.LENGTH_SHORT).show()
-    }
+    /**
+     * JavaScript interface — called from HTML
+     */
+    inner class WebAppInterface(private val activity: Activity) {
 
-    @JavascriptInterface
-    fun vibrate(duration: Long) {
-        (activity.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator)
-            .vibrate(duration)
+        @JavascriptInterface
+        fun showToast(message: String) {
+            android.widget.Toast.makeText(activity, message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+
+        @JavascriptInterface
+        fun vibrate(duration: Long) {
+            (activity.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator)
+                .vibrate(duration)
+        }
+
+        /**
+         * Called when user presses the power button to connect.
+         * configJson is the raw .dgvpn file content.
+         */
+        @JavascriptInterface
+        fun connectVpn(configJson: String) {
+            // Request VPN permission first
+            pendingConfigContent = configJson
+            val vpnIntent = VpnService.prepare(activity)
+            if (vpnIntent != null) {
+                // Need user permission
+                vpnPermissionLauncher.launch(vpnIntent)
+            } else {
+                // Already have permission
+                startVpnService(configJson)
+            }
+        }
+
+        @JavascriptInterface
+        fun disconnectVpn() {
+            stopVpnService()
+        }
+
+        /**
+         * Check if a config is valid (has server info)
+         */
+        @JavascriptInterface
+        fun validateConfig(configJson: String): Boolean {
+            val config = ConfigParser.parse(configJson)
+            return config != null && config.host.isNotEmpty()
+        }
     }
 }

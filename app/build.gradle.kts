@@ -50,4 +50,10 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.activity:activity-ktx:1.8.2")
     implementation("androidx.webkit:webkit:1.9.0")
+
+    // SSH library for real tunneling
+    implementation("com.github.mwiede:jsch:0.2.17")
+
+    // SOCKS proxy + network
+    implementation("io.netty:netty-handler:4.1.104.Final")
 }

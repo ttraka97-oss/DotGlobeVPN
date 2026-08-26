@@ -667,37 +667,84 @@ setInterval(function(){
 function toggleVPN(){
   if(state.connecting) return;
   if(!state.connected){
+    // Check if a config is active
+    if(activeConfigId === null || !configs.length){
+      if(typeof showToast === 'function') showToast('استورد وفعّل كونفيغ .dgvpn أولاً');
+      return;
+    }
+    var activeCfg = configs.find(function(c){ return c.id === activeConfigId; });
+    if(!activeCfg){
+      if(typeof showToast === 'function') showToast('استورد وفعّل كونفيغ .dgvpn أولاً');
+      return;
+    }
     state.connecting=true;
     var btn=document.getElementById('powerBtn');
     btn.classList.add('connecting');
     document.getElementById('statusText').textContent='جاري الاتصال...';
-    document.getElementById('statusSub').textContent='تمهيد القناة المشفرة';
+    document.getElementById('statusSub').textContent='تشفير القناة · '+activeCfg.name;
     vibrate(30);
-    addLog('info','بدء الاتصال بـ '+state.current);
-    setTimeout(function(){
-      state.connecting=false; state.connected=true;
-      btn.classList.remove('connecting'); btn.classList.add('connected');
-      document.getElementById('statusText').textContent='متصل';
-      document.getElementById('statusSub').textContent='الاتصال آمن ومشفّر';
-      document.getElementById('globeAtm').style.opacity='1.6';
-      vibrate([20,40,40]);
-      addLog('info','تم الاتصال · IP مشفر · '+state.ping);
-      animateActivity();
-      startSpeedTracking();
-    },2600);
+    addLog('info','بدء الاتصال · '+activeCfg.name);
+
+    // Call Android VPN service
+    if(typeof Android !== 'undefined' && Android.connectVpn){
+      // Build the .dgvpn content from stored config
+      var cfgContent = JSON.stringify({
+        type: 'DotGlobe-VPN',
+        version: '9.0',
+        enc: activeCfg.enc || ''
+      });
+      Android.connectVpn(cfgContent);
+    } else {
+      // Fallback: simulate connection (web preview only)
+      setTimeout(function(){
+        onVpnConnected();
+      }, 2600);
+    }
   } else {
-    state.connected=false; state.elapsed=0;
+    // Disconnect
+    if(typeof Android !== 'undefined' && Android.disconnectVpn){
+      Android.disconnectVpn();
+    }
+    onVpnDisconnected();
+  }
+}
+
+function onVpnConnected(){
+  state.connecting=false; state.connected=true;
+  var btn=document.getElementById('powerBtn');
+  btn.classList.remove('connecting'); btn.classList.add('connected');
+  document.getElementById('statusText').textContent='متصل';
+  document.getElementById('statusSub').textContent='الاتصال آمن ومشفّر';
+  document.getElementById('globeAtm').style.opacity='1.6';
+  vibrate([20,40,40]);
+  addLog('info','تم الاتصال · IP مشفر · '+state.ping);
+  animateActivity();
+  startSpeedTracking();
+}
+
+function onVpnDisconnected(){
+  state.connected=false; state.connecting=false; state.elapsed=0;
+  var btn=document.getElementById('powerBtn');
+  btn.classList.remove('connected'); btn.classList.remove('connecting');
+  document.getElementById('statusText').textContent='غير متصل';
+  document.getElementById('statusSub').textContent='اضغط زر الطاقة للاتصال';
+  document.getElementById('timer').textContent='00:00:00';
+  document.getElementById('globeAtm').style.opacity='';
+  vibrate(40);
+  addLog('warn','تم قطع الاتصال');
+  stopSpeedTracking();
+  sessionBytes = 0;
+  peakSpeedVal = 0;
+}
+
+function onVpnPermission(granted){
+  if(!granted){
+    state.connecting=false;
     var btn=document.getElementById('powerBtn');
-    btn.classList.remove('connected');
+    btn.classList.remove('connecting');
     document.getElementById('statusText').textContent='غير متصل';
-    document.getElementById('statusSub').textContent='اضغط زر الطاقة للاتصال';
-    document.getElementById('timer').textContent='00:00:00';
-    document.getElementById('globeAtm').style.opacity='';
-    vibrate(40);
-    addLog('warn','تم قطع الاتصال');
-    stopSpeedTracking();
-    sessionBytes = 0;
-    peakSpeedVal = 0;
+    document.getElementById('statusSub').textContent='تم رفض إذن VPN';
+    if(typeof showToast === 'function') showToast('إذن VPN مطلوب للاتصال');
   }
 }
 function vibrate(p){ if(navigator.vibrate){ try{navigator.vibrate(p);}catch(e){} } }
