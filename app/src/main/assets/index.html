@@ -399,12 +399,6 @@
     </div>
   </div>
 
-  <!-- ========== SERVERS ========== -->
-  <div class="screen servers-screen" id="sc-servers">
-    <h1>الخوادم</h1>
-    <div class="srv-list" id="srvListContainer"></div>
-  </div>
-
   <!-- ========== LOGS ========== -->
   <div class="screen logs-screen" id="sc-logs">
     <h1>السجلات</h1>
@@ -452,7 +446,6 @@
   <!-- ========== NAV ========== -->
   <div class="nav" id="nav">
     <button class="nav-btn active" data-sc="home" onclick="goScreen('home')"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span class="lbl">الرئيسية</span></button>
-    <button class="nav-btn" data-sc="servers" onclick="goScreen('servers')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span class="lbl">الخوادم</span></button>
     <button class="nav-btn" data-sc="config" onclick="goScreen('config')"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg><span class="lbl">التكوين</span></button>
     <button class="nav-btn" data-sc="logs" onclick="goScreen('logs')"><svg viewBox="0 0 24 24"><path d="M8 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8M8 3H5a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h3M8 3v18"/><path d="M11 8h6M11 12h6M11 16h4"/></svg><span class="lbl">السجلات</span></button>
     <button class="nav-btn" data-sc="settings" onclick="goScreen('settings')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span class="lbl">الإعدادات</span></button>
@@ -712,15 +705,14 @@ function toggleVPN(){
     if(typeof Android!=='undefined'&&Android.connectVpn){
       var cfgContent=JSON.stringify({type:'DotGlobe-VPN',version:'9.0',enc:activeCfg.enc||''});
       Android.connectVpn(cfgContent);
-    }else{
-      setTimeout(function(){onVpnConnected();},2600);
     }
+    // No fake fallback — wait for real VPN service broadcast
   }else{
     if(typeof Android!=='undefined'&&Android.disconnectVpn){Android.disconnectVpn();}
     onVpnDisconnected();
   }
 }
-function onVpnConnected(){
+function onVpnConnected(msg){
   state.connecting=false;state.connected=true;
   document.body.classList.add('connected');
   var btn=document.getElementById('powerBtn');var ring=document.getElementById('powerRing');
@@ -730,7 +722,31 @@ function onVpnConnected(){
   document.getElementById('statusSub').textContent='الاتصال آمن ومشفر';
   document.getElementById('globeAtm').style.opacity='1.6';
   vibrate([20,40,40]);
-  addLog('info','تم الاتصال · IP مشفر · '+state.ping);
+  addLog('info','تم الاتصال · '+(msg||state.ping));
+}
+function onVpnConnecting(msg){
+  state.connecting=true;
+  document.getElementById('statusText').textContent='جاري الاتصال...';
+  document.getElementById('statusSub').textContent=msg||'البحث عن أفضل سيرفر';
+  var btn=document.getElementById('powerBtn');var ring=document.getElementById('powerRing');
+  btn.classList.add('connecting');if(ring)ring.classList.add('connecting');
+  if(msg)addLog('info',msg);
+}
+function onVpnError(msg){
+  state.connecting=false;state.connected=false;
+  document.body.classList.remove('connected');
+  var btn=document.getElementById('powerBtn');var ring=document.getElementById('powerRing');
+  btn.classList.remove('connecting','connected');if(ring)ring.classList.remove('connecting');
+  document.getElementById('statusText').textContent='فشل الاتصال';
+  document.getElementById('statusSub').textContent=msg||'خطأ غير معروف';
+  if(typeof showToast==='function')showToast('فشل الاتصال: '+(msg||'خطأ'));
+  addLog('warn','فشل الاتصال: '+(msg||'خطأ'));
+  setTimeout(function(){
+    if(!state.connected){
+      document.getElementById('statusText').textContent='غير متصل';
+      document.getElementById('statusSub').textContent='الاتصال آمن ومشفر';
+    }
+  },3000);
 }
 function onVpnDisconnected(){
   state.connected=false;state.connecting=false;state.elapsed=0;state.dataUsed=0;

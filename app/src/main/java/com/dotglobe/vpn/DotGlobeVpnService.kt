@@ -34,6 +34,23 @@ class DotGlobeVpnService : VpnService() {
         const val EXTRA_CONFIG = "config_json"
         private const val CHANNEL_ID = "dotglobe_vpn"
         private const val NOTIF_ID = 1
+
+        const val BROADCAST_STATUS = "com.dotglobe.vpn.STATUS"
+        const val EXTRA_STATUS = "status"
+        const val EXTRA_MESSAGE = "message"
+        const val STATUS_CONNECTING = "connecting"
+        const val STATUS_CONNECTED = "connected"
+        const val STATUS_ERROR = "error"
+        const val STATUS_DISCONNECTED = "disconnected"
+    }
+
+    private fun broadcastStatus(status: String, message: String = "") {
+        val intent = Intent(BROADCAST_STATUS).apply {
+            putExtra(EXTRA_STATUS, status)
+            putExtra(EXTRA_MESSAGE, message)
+            setPackage(packageName)
+        }
+        sendBroadcast(intent)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -55,19 +72,23 @@ class DotGlobeVpnService : VpnService() {
         if (isRunning) return
 
         val proto = config.proto.lowercase()
-        Log.i("DotGlobeVPN", "Protocol: $proto · Using Xray-core")
+        Log.i("DotGlobeVPN", "Protocol: $proto · Host: ${config.host}:${config.port} · Using Xray-core")
+        broadcastStatus(STATUS_CONNECTING, "جاري تشغيل Xray-core...")
 
         // Use Xray-core for all protocols (VMess, VLESS, Trojan, TCP/TLS, SSH)
         xrayRunner = XrayRunner(this)
         xrayRunner?.start(config, object : XrayRunner.XrayCallback {
             override fun onConnected(socksPort: Int) {
+                broadcastStatus(STATUS_CONNECTING, "جاري إنشاء نفق VPN...")
                 establishVpnInterface(config)
             }
             override fun onDisconnected() {
+                broadcastStatus(STATUS_DISCONNECTED, "تم قطع الاتصال")
                 stopVpn()
             }
             override fun onError(message: String) {
                 Log.e("DotGlobeVPN", "Xray error: $message")
+                broadcastStatus(STATUS_ERROR, message)
                 stopVpn()
             }
             override fun onLog(message: String) {
@@ -96,9 +117,12 @@ class DotGlobeVpnService : VpnService() {
             if (vpnInterface != null) {
                 isRunning = true
                 startForeground(NOTIF_ID, createNotification("DotGlobe VPN — متصل · ${config.name}"))
+                broadcastStatus(STATUS_CONNECTED, "تم الاتصال · ${config.host}:${config.port}")
 
                 // Start packet routing loop
                 startPacketRouting()
+            } else {
+                broadcastStatus(STATUS_ERROR, "فشل إنشاء واجهة VPN")
             }
         } catch (e: Exception) {
             Log.e("DotGlobeVPN", "VPN interface error: ${e.message}")

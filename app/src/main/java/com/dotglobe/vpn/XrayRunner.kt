@@ -99,7 +99,8 @@ class XrayRunner(private val context: Context) {
 
         val outbound: String = when (proto) {
             "vmess", "v2ray" -> {
-                // VMess outbound
+                // VMess outbound — use uuid not password
+                val userId = if (config.uuid.isNotEmpty()) config.uuid else config.password
                 """{
                     "protocol": "vmess",
                     "settings": {
@@ -107,24 +108,25 @@ class XrayRunner(private val context: Context) {
                             "address": "${config.host}",
                             "port": ${config.port},
                             "users": [{
-                                "id": "${config.password}",
+                                "id": "$userId",
                                 "alterId": 0,
                                 "security": "auto"
                             }]
                         }]
                     },
                     "streamSettings": {
-                        "network": "tcp",
-                        "security": "tls",
+                        "network": "${if (config.transport == "ws") "ws" else "tcp"}",
+                        "security": "${if (config.tls == "tls" || config.tls == "tls") "tls" else "none"}",
                         "tlsSettings": {
                             "serverName": "$sni",
                             "allowInsecure": true
-                        }
+                        }${if (config.transport == "ws" && config.path.isNotEmpty()) ",\"wsSettings\":{\"path\":\"" + config.path + "\"}" else ""}
                     }
                 }"""
             }
             "vless" -> {
-                // VLESS outbound
+                // VLESS outbound — use uuid
+                val userId = if (config.uuid.isNotEmpty()) config.uuid else config.password
                 """{
                     "protocol": "vless",
                     "settings": {
@@ -132,18 +134,18 @@ class XrayRunner(private val context: Context) {
                             "address": "${config.host}",
                             "port": ${config.port},
                             "users": [{
-                                "id": "${config.password}",
+                                "id": "$userId",
                                 "encryption": "none"
                             }]
                         }]
                     },
                     "streamSettings": {
-                        "network": "tcp",
-                        "security": "tls",
+                        "network": "${if (config.transport == "ws") "ws" else "tcp"}",
+                        "security": "${if (config.tls == "tls") "tls" else "none"}",
                         "tlsSettings": {
                             "serverName": "$sni",
                             "allowInsecure": true
-                        }
+                        }${if (config.transport == "ws" && config.path.isNotEmpty()) ",\"wsSettings\":{\"path\":\"" + config.path + "\"}" else ""}
                     }
                 }"""
             }
@@ -206,7 +208,8 @@ class XrayRunner(private val context: Context) {
                 }"""
             }
             else -> {
-                // Default: VMess
+                // Default: VMess — use uuid
+                val userId = if (config.uuid.isNotEmpty()) config.uuid else config.password
                 """{
                     "protocol": "vmess",
                     "settings": {
@@ -214,7 +217,7 @@ class XrayRunner(private val context: Context) {
                             "address": "${config.host}",
                             "port": ${config.port},
                             "users": [{
-                                "id": "${config.password}",
+                                "id": "$userId",
                                 "alterId": 0
                             }]
                         }]

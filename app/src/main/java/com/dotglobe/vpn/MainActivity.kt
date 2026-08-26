@@ -2,7 +2,10 @@ package com.dotglobe.vpn
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
@@ -20,6 +23,37 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var pendingConfigContent: String? = null
+
+    private val vpnStatusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val status = intent?.getStringExtra(DotGlobeVpnService.EXTRA_STATUS) ?: return
+            val message = intent.getStringExtra(DotGlobeVpnService.EXTRA_MESSAGE) ?: ""
+            webView.post {
+                when (status) {
+                    DotGlobeVpnService.STATUS_CONNECTING -> {
+                        webView.evaluateJavascript(
+                            "if(typeof onVpnConnecting === 'function'){onVpnConnecting('${message.replace("'", "\\'")}');}", null
+                        )
+                    }
+                    DotGlobeVpnService.STATUS_CONNECTED -> {
+                        webView.evaluateJavascript(
+                            "if(typeof onVpnConnected === 'function'){onVpnConnected('${message.replace("'", "\\'")}');}", null
+                        )
+                    }
+                    DotGlobeVpnService.STATUS_ERROR -> {
+                        webView.evaluateJavascript(
+                            "if(typeof onVpnError === 'function'){onVpnError('${message.replace("'", "\\'")}');}", null
+                        )
+                    }
+                    DotGlobeVpnService.STATUS_DISCONNECTED -> {
+                        webView.evaluateJavascript(
+                            "if(typeof onVpnDisconnected === 'function'){onVpnDisconnected();}", null
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,6 +100,14 @@ class MainActivity : ComponentActivity() {
 
         webView.loadUrl("file:///android_asset/index.html")
         handleIntent(intent)
+
+        // Register VPN status receiver
+        registerReceiver(vpnStatusReceiver, IntentFilter(DotGlobeVpnService.BROADCAST_STATUS), RECEIVER_NOT_EXPORTED)
+    }
+
+    override fun onDestroy() {
+        try { unregisterReceiver(vpnStatusReceiver) } catch (_: Exception) {}
+        super.onDestroy()
     }
 
     private val fileChooserLauncher = registerForActivityResult(
@@ -131,14 +173,20 @@ class MainActivity : ComponentActivity() {
                 putExtra(DotGlobeVpnService.EXTRA_CONFIG, configJson)
             }
             startService(intent)
-
+            // Don't call onVpnConnected here — wait for VPN service to actually connect
+            // The VPN service will broadcast connection status
             webView.post {
                 webView.evaluateJavascript(
-                    "if(typeof onVpnConnected === 'function'){onVpnConnected();}", null
+                    "if(typeof onVpnConnecting === 'function'){onVpnConnecting();}", null
                 )
             }
         } catch (e: Exception) {
             Log.e("DotGlobeVPN", "Failed to start VPN: ${e.message}")
+            webView.post {
+                webView.evaluateJavascript(
+                    "if(typeof onVpnError === 'function'){onVpnError('${e.message}');}", null
+                )
+            }
         }
     }
 
