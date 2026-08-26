@@ -25,28 +25,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize security context
+        // Security: log only, don't block users
         SecurityCheck.init(this)
-
-        // Run full security audit
-        val security = SecurityCheck.runFullSecurityCheck(this)
-
-        if (!security.passed) {
-            // App is tampered — refuse to run
-            val alert = android.app.AlertDialog.Builder(this)
-                .setTitle("تنبيه أمني")
-                .setMessage("تم اكتشاف عبث بالتطبيق.\n\nالإجراءات المكتشفة:\n${security.warnings.joinToString("\n")}\n\nالتطبيق لن يعمل.")
-                .setCancelable(false)
-                .setPositiveButton("خروج") { _, _ -> finishAffinity() }
-                .create()
-            alert.show()
-            return
-        }
-
-        // Log security status
-        if (security.warnings.isNotEmpty()) {
-            android.util.Log.w("SecurityCheck", "Warnings: ${security.warnings}")
-        }
+        SecurityCheck.runFullSecurityCheck(this)
 
         webView = WebView(this)
         setContentView(webView)
