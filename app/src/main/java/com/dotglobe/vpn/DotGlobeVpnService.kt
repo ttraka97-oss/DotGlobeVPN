@@ -22,6 +22,9 @@ class DotGlobeVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
     private var isRunning = false
     private var sshTunnel: SshTunnel? = null
+    private var trojanTunnel: TrojanTunnel? = null
+    private var v2rayTunnel: V2RayTunnel? = null
+    private var tcpTlsTunnel: TcpTlsTunnel? = null
     private var currentConfig: ConfigParser.VpnConfig? = null
 
     companion object {
@@ -50,27 +53,58 @@ class DotGlobeVpnService : VpnService() {
     private fun startVpn(config: ConfigParser.VpnConfig) {
         if (isRunning) return
 
-        // Start SSH tunnel first
-        sshTunnel = SshTunnel()
-        sshTunnel?.connect(config, object : SshTunnel.TunnelCallback {
-            override fun onConnected() {
-                // Once SSH is connected, establish VPN interface
-                establishVpnInterface(config)
+        val proto = config.proto.lowercase()
+        Log.i("DotGlobeVPN", "Protocol: $proto")
+
+        val callback = object : SshTunnel.TunnelCallback {
+            override fun onConnected() { establishVpnInterface(config) }
+            override fun onDisconnected() { stopVpn() }
+            override fun onError(message: String) { Log.e("DotGlobeVPN", message); stopVpn() }
+            override fun onLog(message: String) { Log.i("DotGlobeVPN", message) }
+            override fun onStats(download: Long, upload: Long) {}
+        }
+
+        when (proto) {
+            "ssh" -> {
+                sshTunnel = SshTunnel()
+                sshTunnel?.connect(config, callback)
             }
-            override fun onDisconnected() {
-                stopVpn()
+            "trojan" -> {
+                trojanTunnel = TrojanTunnel()
+                trojanTunnel?.connect(config, object : TrojanTunnel.TunnelCallback {
+                    override fun onConnected() { establishVpnInterface(config) }
+                    override fun onDisconnected() { stopVpn() }
+                    override fun onError(message: String) { Log.e("DotGlobeVPN", message); stopVpn() }
+                    override fun onLog(message: String) { Log.i("DotGlobeVPN", message) }
+                    override fun onStats(download: Long, upload: Long) {}
+                })
             }
-            override fun onError(message: String) {
-                Log.e("DotGlobeVPN", "Tunnel error: $message")
-                stopVpn()
+            "vmess", "vless", "v2ray" -> {
+                v2rayTunnel = V2RayTunnel()
+                v2rayTunnel?.connect(config, object : V2RayTunnel.TunnelCallback {
+                    override fun onConnected() { establishVpnInterface(config) }
+                    override fun onDisconnected() { stopVpn() }
+                    override fun onError(message: String) { Log.e("DotGlobeVPN", message); stopVpn() }
+                    override fun onLog(message: String) { Log.i("DotGlobeVPN", message) }
+                    override fun onStats(download: Long, upload: Long) {}
+                })
             }
-            override fun onLog(message: String) {
-                Log.i("DotGlobeVPN", message)
+            "tcp", "tls", "tcp/tls" -> {
+                tcpTlsTunnel = TcpTlsTunnel()
+                tcpTlsTunnel?.connect(config, object : TcpTlsTunnel.TunnelCallback {
+                    override fun onConnected() { establishVpnInterface(config) }
+                    override fun onDisconnected() { stopVpn() }
+                    override fun onError(message: String) { Log.e("DotGlobeVPN", message); stopVpn() }
+                    override fun onLog(message: String) { Log.i("DotGlobeVPN", message) }
+                    override fun onStats(download: Long, upload: Long) {}
+                })
             }
-            override fun onStats(download: Long, upload: Long) {
-                // Stats could be sent to UI via broadcast
+            else -> {
+                // Default: try SSH
+                sshTunnel = SshTunnel()
+                sshTunnel?.connect(config, callback)
             }
-        })
+        }
     }
 
     private fun establishVpnInterface(config: ConfigParser.VpnConfig) {
@@ -141,7 +175,11 @@ class DotGlobeVpnService : VpnService() {
                     )
 
                     val protocol = packet[9].toInt() and 0xFF
-                    val socksPort = sshTunnel?.getSocksPort() ?: 0
+                    val socksPort = sshTunnel?.getSocksPort()
+                        ?: trojanTunnel?.getSocksPort()
+                        ?: v2rayTunnel?.getSocksPort()
+                        ?: tcpTlsTunnel?.getSocksPort()
+                        ?: 0
 
                     if (socksPort > 0) {
                         // Route TCP through SOCKS
@@ -215,7 +253,13 @@ class DotGlobeVpnService : VpnService() {
     private fun stopVpn() {
         isRunning = false
         try { sshTunnel?.disconnect() } catch (_: Exception) {}
+        try { trojanTunnel?.disconnect() } catch (_: Exception) {}
+        try { v2rayTunnel?.disconnect() } catch (_: Exception) {}
+        try { tcpTlsTunnel?.disconnect() } catch (_: Exception) {}
         sshTunnel = null
+        trojanTunnel = null
+        v2rayTunnel = null
+        tcpTlsTunnel = null
         try { vpnInterface?.close() } catch (_: Exception) {}
         vpnInterface = null
         stopForeground(STOP_FOREGROUND_REMOVE)
