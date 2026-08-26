@@ -374,8 +374,18 @@
           استيراد ملف .dgvpn
         </label>
         <input type="file" id="cfgFileInput" accept=".dgvpn" style="display:none" onchange="handleConfigUpload(event)">
-        <div style="text-align:center;padding:30px 10px;color:var(--muted);font-size:12px">
+        <div style="text-align:center;padding:12px 10px;color:var(--muted);font-size:12px">
           الصيغة الحصرية لـ DotGlobe VPN<br>.dgvpn — مشفرة وآمنة
+        </div>
+        <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:12px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;padding:0 2px;">استيراد رابط مشاركة</label>
+          <div class="mc-field">
+            <input type="text" id="shareLinkInput" placeholder="vmess://... أو vless://... أو trojan://..." style="direction:ltr;font-size:12px" autocomplete="off">
+          </div>
+          <button class="mc-save-btn" onclick="importShareLink()" style="margin-top:4px">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            استيراد الرابط
+          </button>
         </div>
       </div>
       <!-- LIST TAB -->
@@ -511,6 +521,57 @@ function selectProto(el){
   }else if(mcProto==='tcp'){
     if(uuidF)uuidF.style.display='none';if(passF)passF.style.display='none';if(userF)userF.style.display='none';
   }
+}
+
+// ============ IMPORT SHARE LINK (vmess:// / vless:// / trojan://) ============
+function importShareLink(){
+  var raw=(document.getElementById('shareLinkInput')&&document.getElementById('shareLinkInput').value||'').trim();
+  if(!raw){showToast('ألصق رابط المشاركة');return;}
+  var proto='',host='',port='',uuid='',pass='',sni='',transport='tcp',path='',tls='';
+  var name='مستورد';
+  try{
+    if(raw.startsWith('vmess://')){
+      proto='vmess';
+      var b64=raw.substring(8);
+      // Add padding
+      while(b64.length%4)b64+='=';
+      var json=JSON.parse(atob(b64));
+      host=json.add||'';port=json.port||'';uuid=json.id||'';
+      transport=json.net||'tcp';path=json.path||'';tls=json.tls||'';sni=json.sni||json.host||'';
+      name=json.ps||('VMess '+host);
+    }else if(raw.startsWith('vless://')){
+      proto='vless';
+      var url=new URL(raw);
+      host=url.hostname;port=url.port||'443';uuid=url.username||'';
+      transport=url.searchParams.get('type')||'tcp';path=url.searchParams.get('path')||'';
+      tls=url.searchParams.get('security')||'';sni=url.searchParams.get('sni')||host;
+      name=url.searchParams.get('name')||('VLESS '+host);
+    }else if(raw.startsWith('trojan://')){
+      proto='trojan';
+      var url=new URL(raw);
+      host=url.hostname;port=url.port||'443';pass=url.username||'';
+      transport=url.searchParams.get('type')||'tcp';path=url.searchParams.get('path')||'';
+      sni=url.searchParams.get('sni')||host;tls='tls';
+      name=url.searchParams.get('name')||('Trojan '+host);
+    }else{
+      showToast('رابط غير مدعوم');return;
+    }
+  }catch(e){showToast('فشل قراءة الرابط: '+e.message);return;}
+  if(!host||!port){showToast('الرابط ناقص بيانات');return;}
+  // Build config data
+  var cfgData={app:'DotGlobe',version:'9.0',name:name,proto:proto,host:host,port:parseInt(port),transport:transport,dns:'1.1.1.1',payload:'',sni:sni,user:'',pass:pass,uuid:uuid,path:path,tls:tls,created:new Date().toISOString()};
+  var jsonStr=JSON.stringify(cfgData);
+  var encrypted=toBase64(xorEncrypt(jsonStr,DGVPN_KEY));
+  var newCfg={id:Date.now(),name:name,proto:proto.toUpperCase(),enc:encrypted,file:name.replace(/\s+/g,'_')+'.dgvpn',date:new Date().toLocaleDateString('ar-DZ')};
+  configs.unshift(newCfg);
+  localStorage.setItem('dgvpn_configs',JSON.stringify(configs));
+  renderConfigList();
+  activateConfig(newCfg.id);
+  showToast('تم استيراد: '+name);
+  addLog('config','استيراد رابط '+proto.toUpperCase()+': '+host+':'+port);
+  // Clear input
+  var inp=document.getElementById('shareLinkInput');if(inp)inp.value='';
+  goScreen('home');
 }
 
 // ============ SAVE MANUAL CONFIG ============
