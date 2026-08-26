@@ -6,7 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>DotGlobe VPN — ALPHA GO</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root{
     --bg:#000000;
@@ -706,48 +705,23 @@ function escCfg(s){
   return String(s).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"').replace(/'/g,'&#39;');
 }
 
-// ============ THREE.JS DOT-MATRIX POINT-CLOUD GLOBE ============
+// ============ CANVAS 2D DOT-MATRIX GLOBE (NO EXTERNAL DEPS) ============
 var G = (function(){
-  var canvas=document.getElementById('globeCanvas');
-  var renderer,scene,camera,globe,points,atm,stars;
-  var rotSpeed=0.0025, dragging=false, lastX=0,lastY=0, autoRot=true;
-  var pointsMat;
-  var highlightAttr=null; // for selected country region brightness
+  var canvas, ctx, W=260, H=260, cx=130, cy=130, R=100;
+  var rotY=0, rotX=0.3;
+  var dragging=false, lastX=0, lastY=0, autoRot=true;
+  var dots=[]; // {x,y,z,bright}
 
-  // dot texture via canvas
-  function makeDotTexture(){
-    var c=document.createElement('canvas'); c.width=64; c.height=64;
-    var ctx=c.getContext('2d');
-    var g=ctx.createRadialGradient(32,32,0,32,32,32);
-    g.addColorStop(0,'rgba(255,255,255,1)');
-    g.addColorStop(0.35,'rgba(255,255,255,0.85)');
-    g.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.fillStyle=g; ctx.fillRect(0,0,64,64);
-    var tex=new THREE.CanvasTexture(c); return tex;
-  }
-
-  // crude landmass mask (lat/lon boxes approximating continents)
   function isLand(lat, lon){
-    // lat in [-90,90], lon in [-180,180]
-    // define approximate continent regions as lat/lon polygon-ish boxes
     var regions=[
-      // North America
       {la:[25,70], lo:[-170,-55]},
-      // South America
       {la:[-55,12], lo:[-82,-35]},
-      // Europe
       {la:[36,71], lo:[-10,40]},
-      // Africa
       {la:[-35,37], lo:[-18,52]},
-      // Middle East
       {la:[12,42], lo:[35,63]},
-      // Asia
       {la:[5,75], lo:[40,150]},
-      // SE Asia / Indonesia
       {la:[-10,25], lo:[95,141]},
-      // Australia
       {la:[-39,-10], lo:[113,154]},
-      // Greenland
       {la:[60,83], lo:[-55,-20]}
     ];
     for(var i=0;i<regions.length;i++){
@@ -758,128 +732,118 @@ var G = (function(){
   }
 
   function init(){
-    var size=260;
-    renderer=new THREE.WebGLRenderer({canvas:canvas,alpha:true,antialias:true});
-    renderer.setSize(size,size,false);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    canvas=document.getElementById('globeCanvas');
+    if(!canvas) return;
+    var dpr=Math.min(window.devicePixelRatio||1, 2);
+    canvas.width=W*dpr; canvas.height=H*dpr;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx=canvas.getContext('2d');
+    ctx.scale(dpr,dpr);
 
-    scene=new THREE.Scene();
-    camera=new THREE.PerspectiveCamera(45,1,0.1,100);
-    camera.position.z=3.0;
-
-    var tex=makeDotTexture();
-
-    // Build point cloud from sphere vertices, sampling landmass
-    var geo=new THREE.SphereGeometry(1, 96, 64);
-    var positions=geo.attributes.position;
-    var N=positions.count;
-    var landPos=[];
-    var landCol=[];
-    var baseCol=new THREE.Color(0xA855F7);
-    var glowCol=new THREE.Color(0xC77DFF);
-
-    for(var i=0;i<N;i++){
-      var x=positions.getX(i), y=positions.getY(i), z=positions.getZ(i);
-      // convert to lat/lon
-      var lat=Math.asin(y)*180/Math.PI;
-      var lon=Math.atan2(z,x)*180/Math.PI;
-      if(isLand(lat,lon)){
-        landPos.push(x,y,z);
-        // highlight Algeria / North Africa region (lat ~22-37, lon ~-9 to 12) brighter
-        var bright=0.55;
-        if(lat>=18 && lat<=38 && lon>=-12 && lon<=14){ bright=1.0; }
-        var col=glowCol.clone().lerp(baseCol, 1-bright);
-        landCol.push(col.r*bright, col.g*bright, col.b*bright);
-      }
-    }
-    // If too few, add randomized extra land dots for density (6000+ target)
-    var extraTarget=6500;
-    while(landPos.length/3 < extraTarget){
+    // Generate dots on sphere surface
+    var target=5000;
+    var attempts=0;
+    while(dots.length<target && attempts<50000){
+      attempts++;
       var u=Math.random(), v=Math.random();
       var theta=2*Math.PI*u;
       var phi=Math.acos(2*v-1);
-      var x2=Math.sin(phi)*Math.cos(theta);
-      var y2=Math.cos(phi);
-      var z2=Math.sin(phi)*Math.sin(theta);
-      var lat2=Math.asin(y2)*180/Math.PI;
-      var lon2=Math.atan2(z2,x2)*180/Math.PI;
-      if(isLand(lat2,lon2)){
-        landPos.push(x2,y2,z2);
-        var bright2=0.5+Math.random()*0.15;
-        if(lat2>=18 && lat2<=38 && lon2>=-12 && lon2<=14){ bright2=1.0; }
-        var c2=glowCol.clone().lerp(baseCol, 1-bright2);
-        landCol.push(c2.r*bright2, c2.g*bright2, c2.b*bright2);
+      var x=Math.sin(phi)*Math.cos(theta);
+      var y=Math.cos(phi);
+      var z=Math.sin(phi)*Math.sin(theta);
+      var lat=Math.asin(y)*180/Math.PI;
+      var lon=Math.atan2(z,x)*180/Math.PI;
+      if(isLand(lat,lon)){
+        var bright=0.4+Math.random()*0.2;
+        if(lat>=18 && lat<=38 && lon>=-12 && lon<=14) bright=1.0;
+        dots.push({x:x,y:y,z:z,bright:bright});
       }
     }
 
-    var pgeo=new THREE.BufferGeometry();
-    pgeo.setAttribute('position', new THREE.Float32BufferAttribute(landPos,3));
-    pgeo.setAttribute('color', new THREE.Float32BufferAttribute(landCol,3));
-    pointsMat=new THREE.PointsMaterial({
-      size:0.022, map:tex, vertexColors:true, transparent:true, opacity:0.9,
-      blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+    canvas.addEventListener('pointerdown',function(e){dragging=true;lastX=e.clientX;lastY=e.clientY;autoRot=false;e.preventDefault();});
+    canvas.addEventListener('pointermove',function(e){
+      if(!dragging)return;
+      var dx=e.clientX-lastX, dy=e.clientY-lastY;
+      rotY+=dx*0.008;
+      rotX+=dy*0.008;
+      rotX=Math.max(-1.2,Math.min(1.2,rotX));
+      lastX=e.clientX;lastY=e.clientY;
     });
-    points=new THREE.Points(pgeo, pointsMat);
-    globe=new THREE.Group();
-    globe.add(points);
-    scene.add(globe);
-
-    // dark inner sphere to give globe body
-    var igeo=new THREE.SphereGeometry(0.985,48,48);
-    var imat=new THREE.MeshBasicMaterial({color:0x05000a, transparent:true, opacity:0.92});
-    var inner=new THREE.Mesh(igeo,imat);
-    globe.add(inner);
-
-    // atmosphere sprite glow behind globe
-    var atmCanvas=document.createElement('canvas'); atmCanvas.width=256; atmCanvas.height=256;
-    var actx=atmCanvas.getContext('2d');
-    var ag=actx.createRadialGradient(128,128,40,128,128,128);
-    ag.addColorStop(0,'rgba(199,125,255,0.0)');
-    ag.addColorStop(0.5,'rgba(168,85,247,0.25)');
-    ag.addColorStop(0.75,'rgba(168,85,247,0.10)');
-    ag.addColorStop(1,'rgba(0,0,0,0)');
-    actx.fillStyle=ag; actx.fillRect(0,0,256,256);
-    var atmTex=new THREE.CanvasTexture(atmCanvas);
-    var atmMat=new THREE.SpriteMaterial({map:atmTex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false});
-    atm=new THREE.Sprite(atmMat);
-    atm.scale.set(3.2,3.2,1);
-    scene.add(atm);
-
-    // stars
-    var sgeo=new THREE.BufferGeometry();
-    var Ns=500, spos=new Float32Array(Ns*3);
-    for(var j=0;j<Ns;j++){var r=18+Math.random()*30,th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1);spos[j*3]=r*Math.sin(ph)*Math.cos(th);spos[j*3+1]=r*Math.sin(ph)*Math.sin(th);spos[j*3+2]=r*Math.cos(ph);}
-    sgeo.setAttribute('position',new THREE.BufferAttribute(spos,3));
-    var smat=new THREE.PointsMaterial({color:0xffffff,size:0.08,transparent:true,opacity:0.6,sizeAttenuation:true});
-    stars=new THREE.Points(sgeo,smat); scene.add(stars);
-
-    // drag
-    canvas.addEventListener('pointerdown',onDown);
-    canvas.addEventListener('pointermove',onMove);
-    canvas.addEventListener('pointerup',onUp);
-    canvas.addEventListener('pointerleave',onUp);
+    canvas.addEventListener('pointerup',function(){dragging=false;autoRot=true;});
+    canvas.addEventListener('pointerleave',function(){dragging=false;autoRot=true;});
 
     animate();
   }
 
-  function onDown(e){dragging=true;lastX=e.clientX;lastY=e.clientY;autoRot=false;}
-  function onMove(e){
-    if(!dragging)return;
-    var dx=e.clientX-lastX, dy=e.clientY-lastY;
-    globe.rotation.y+=dx*0.005;
-    globe.rotation.x+=dy*0.005;
-    globe.rotation.x=Math.max(-1.2,Math.min(1.2,globe.rotation.x));
-    lastX=e.clientX; lastY=e.clientY;
-  }
-  function onUp(){dragging=false;autoRot=true;}
-
   function animate(){
     requestAnimationFrame(animate);
-    if(autoRot){globe.rotation.y+=state.connected?rotSpeed*2.2:rotSpeed;}
-    atm.scale.setScalar(state.connected?3.6:3.2);
-    if(pointsMat){ pointsMat.opacity=state.connected?1.0:0.85; pointsMat.size=state.connected?0.025:0.022; }
-    stars.rotation.y+=0.0003;
-    renderer.render(scene,camera);
+    if(autoRot) rotY += state.connected ? 0.008 : 0.004;
+
+    ctx.clearRect(0,0,W,H);
+
+    // Atmosphere glow
+    var ag=ctx.createRadialGradient(cx,cy,20,cx,cy,R+30);
+    ag.addColorStop(0,'rgba(168,85,247,0.0)');
+    ag.addColorStop(0.4,'rgba(168,85,247,'+(state.connected?0.25:0.15)+')');
+    ag.addColorStop(0.7,'rgba(168,85,247,0.05)');
+    ag.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=ag;
+    ctx.fillRect(0,0,W,H);
+
+    // Dark sphere body
+    ctx.beginPath();
+    ctx.arc(cx,cy,R,0,Math.PI*2);
+    ctx.fillStyle='#05000a';
+    ctx.fill();
+
+    // Sort dots by z (back to front)
+    var cosX=Math.cos(rotX), sinX=Math.sin(rotX);
+    var cosY=Math.cos(rotY), sinY=Math.sin(rotY);
+    var projected=[];
+
+    for(var i=0;i<dots.length;i++){
+      var d=dots[i];
+      // Rotate Y
+      var x1=d.x*cosY - d.z*sinY;
+      var z1=d.x*sinY + d.z*cosY;
+      var y1=d.y;
+      // Rotate X
+      var y2=y1*cosX - z1*sinX;
+      var z2=y1*sinX + z1*cosX;
+      var x2=x1;
+
+      if(z2 > -0.3){ // only draw front-facing dots
+        var scale=R;
+        var px=cx + x2*scale;
+        var py=cy - y2*scale;
+        var depth=(z2+1)/2; // 0=back, 1=front
+        var size=0.8 + depth*1.5;
+        var alpha=d.bright * (0.3 + depth*0.7);
+        projected.push({px:px,py:py,size:size,alpha:alpha,bright:d.bright});
+      }
+    }
+
+    // Draw dots
+    for(var i=0;i<projected.length;i++){
+      var p=projected[i];
+      var color;
+      if(p.bright >= 0.9){
+        color='rgba(199,125,255,'+p.alpha+')'; // Algeria glow
+      } else {
+        color='rgba(168,85,247,'+p.alpha+')'; // normal purple
+      }
+      ctx.beginPath();
+      ctx.arc(p.px, p.py, p.size, 0, Math.PI*2);
+      ctx.fillStyle=color;
+      ctx.fill();
+    }
+
+    // Rim light
+    ctx.beginPath();
+    ctx.arc(cx,cy,R,0,Math.PI*2);
+    ctx.strokeStyle='rgba(199,125,255,'+(state.connected?0.3:0.15)+')';
+    ctx.lineWidth=1;
+    ctx.stroke();
   }
 
   return {init:init};
