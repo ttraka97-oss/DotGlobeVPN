@@ -28,12 +28,17 @@
 
   /* subtle radial glow behind globe */
   .bg-glow{
-    position:absolute;top:14%;left:50%;transform:translateX(-50%);
-    width:340px;height:340px;border-radius:50%;
-    background:radial-gradient(circle, rgba(168,85,247,0.18) 0%, rgba(168,85,247,0.06) 40%, rgba(0,0,0,0) 70%);
+    position:absolute;top:8%;left:50%;transform:translateX(-50%);
+    width:320px;height:320px;border-radius:50%;
+    background:radial-gradient(circle, rgba(168,85,247,0.22) 0%, rgba(168,85,247,0.08) 40%, rgba(0,0,0,0) 70%);
     pointer-events:none;z-index:0;transition:opacity .6s, filter .6s;
   }
-  body.connected .bg-glow{filter:brightness(1.6);}
+  body.connected .bg-glow{filter:brightness(1.8);}
+  /* concentric rings behind globe */
+  .bg-rings{position:absolute;top:6%;left:50%;transform:translateX(-50%);width:360px;height:360px;pointer-events:none;z-index:0;opacity:0.4;}
+  .bg-rings::before,.bg-rings::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(168,85,247,0.08);}
+  .bg-rings::before{width:100%;height:100%;}
+  .bg-rings::after{width:75%;height:75%;border-color:rgba(168,85,247,0.06);}
 
   /* ===== SCREENS ===== */
   .screen{position:absolute;inset:0;display:none;flex-direction:column;z-index:1;}
@@ -41,36 +46,36 @@
   @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 
   /* ===== HOME SCREEN ===== */
-  .home-top{flex:0 0 auto;padding:env(safe-area-inset-top,12px) 16px 0;}
-  .globe-wrap{flex:0 0 auto;display:flex;align-items:center;justify-content:center;position:relative;height:260px;margin-top:6px;}
+  .home-top{flex:0 0 auto;padding:env(safe-area-inset-top,8px) 16px 0;}
+  .globe-wrap{flex:0 0 auto;display:flex;align-items:center;justify-content:center;position:relative;height:230px;margin-top:2px;}
   #globeCanvas{display:block;cursor:grab;touch-action:none;}
   #globeCanvas:active{cursor:grabbing;}
   #globeAtm{
-    position:absolute;width:280px;height:280px;border-radius:50%;
-    background:radial-gradient(circle, rgba(199,125,255,0.22) 0%, rgba(168,85,247,0.10) 45%, rgba(0,0,0,0) 70%);
-    pointer-events:none;transition:opacity .6s;opacity:0.85;
+    position:absolute;width:250px;height:250px;border-radius:50%;
+    background:radial-gradient(circle, rgba(199,125,255,0.28) 0%, rgba(168,85,247,0.12) 45%, rgba(0,0,0,0) 70%);
+    pointer-events:none;transition:opacity .6s;opacity:0.9;
   }
 
-  .home-center{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:0 20px;}
+  .home-center{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px;gap:2px;}
 
   /* status text */
-  .status-text{font-size:15px;font-weight:600;letter-spacing:0.5px;color:var(--glow);margin-bottom:6px;transition:color .3s;}
+  .status-text{font-size:13px;font-weight:600;letter-spacing:1px;color:rgba(255,255,255,0.6);margin-bottom:2px;transition:color .3s;text-transform:uppercase;}
   body.connected .status-text{color:var(--glow);text-shadow:0 0 12px rgba(199,125,255,0.6);}
 
   /* LED timer */
   .timer{
     font-family:'SFMono-Regular',Menlo,Consolas,'Courier New',monospace;
-    font-size:36px;font-weight:700;letter-spacing:2px;color:#fff;
-    text-shadow:0 0 8px rgba(199,125,255,0.9),0 0 18px rgba(168,85,247,0.7),0 0 28px rgba(168,85,247,0.4);
-    line-height:1.1;margin-bottom:18px;direction:ltr;
+    font-size:32px;font-weight:700;letter-spacing:3px;color:#fff;
+    text-shadow:0 0 6px rgba(199,125,255,0.9),0 0 14px rgba(168,85,247,0.6),0 0 24px rgba(168,85,247,0.3);
+    line-height:1.1;margin-bottom:12px;direction:ltr;
   }
 
   /* server pill - glassmorphism */
   .server-pill{
     display:flex;align-items:center;gap:9px;
     background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-    border:1px solid var(--border);border-radius:100px;padding:7px 16px 7px 8px;
-    box-shadow:0 4px 24px rgba(0,0,0,0.4);margin-bottom:24px;
+    border:1px solid var(--border);border-radius:100px;padding:6px 14px 6px 7px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.4);margin-bottom:14px;
   }
   .server-pill .flag-dot{width:26px;height:26px;border-radius:50%;flex:0 0 auto;background:#222;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.15);}
   .server-pill .srv-name{font-size:14px;font-weight:600;}
@@ -78,16 +83,16 @@
   .server-pill .srv-ping::before{content:'';width:6px;height:6px;border-radius:50%;background:#34C759;box-shadow:0 0 6px #34C759;}
 
   /* power button */
-  .power-wrap{position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;}
+  .power-wrap{position:relative;width:110px;height:110px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;margin-top:4px;}
   #powerBtn{
-    width:90px;height:90px;border-radius:50%;border:none;cursor:pointer;
+    width:82px;height:82px;border-radius:50%;border:none;cursor:pointer;
     background:radial-gradient(circle at 50% 40%, rgba(40,20,60,0.9), rgba(10,5,20,0.95));
     display:flex;align-items:center;justify-content:center;position:relative;z-index:2;
     box-shadow:0 0 0 2px rgba(168,85,247,0.5), 0 0 24px rgba(168,85,247,0.35), inset 0 0 20px rgba(168,85,247,0.15);
     transition:box-shadow .4s, transform .2s;
   }
   #powerBtn:active{transform:scale(0.96);}
-  #powerBtn svg{width:38px;height:38px;stroke:var(--glow);stroke-width:2;fill:none;stroke-linecap:round;filter:drop-shadow(0 0 6px rgba(199,125,255,0.8));}
+  #powerBtn svg{width:34px;height:34px;stroke:var(--glow);stroke-width:2;fill:none;stroke-linecap:round;filter:drop-shadow(0 0 6px rgba(199,125,255,0.8));}
   /* neon ring */
   .power-ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(168,85,247,0.6);box-shadow:0 0 18px rgba(168,85,247,0.4);pointer-events:none;transition:all .4s;}
   /* connecting pulse */
@@ -101,7 +106,7 @@
   @keyframes orbitRing{0%{transform:rotate(0deg) scale(1.08);border-top-color:transparent;}100%{transform:rotate(360deg) scale(1.08);border-top-color:transparent;}}
 
   /* country pills - horizontal scroll */
-  .country-pills{display:flex;gap:8px;overflow-x:auto;padding:18px 16px 8px;scrollbar-width:none;-ms-overflow-style:none;flex:0 0 auto;}
+  .country-pills{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 6px;scrollbar-width:none;-ms-overflow-style:none;flex:0 0 auto;}
   .country-pills::-webkit-scrollbar{display:none;}
   .cpill{
     flex:0 0 auto;display:flex;align-items:center;gap:7px;
@@ -193,6 +198,7 @@
 <body>
 <div class="app">
   <div class="bg-glow"></div>
+  <div class="bg-rings"></div>
 
   <!-- ========== HOME ========== -->
   <div class="screen active" id="sc-home">
@@ -707,7 +713,7 @@ function escCfg(s){
 
 // ============ CANVAS 2D DOT-MATRIX GLOBE (NO EXTERNAL DEPS) ============
 var G = (function(){
-  var canvas, ctx, W=260, H=260, cx=130, cy=130, R=100;
+  var canvas, ctx, W=230, H=230, cx=115, cy=115, R=95;
   var rotY=0, rotX=0.3;
   var dragging=false, lastX=0, lastY=0, autoRot=true;
   var dots=[]; // {x,y,z,bright}
