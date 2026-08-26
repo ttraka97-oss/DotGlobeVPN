@@ -130,19 +130,16 @@
   .cfg-header{padding:10px 18px 6px;}
   .cfg-header h1{font-size:22px;font-weight:800;}
   .cfg-header p{font-size:12px;color:var(--muted);margin-top:2px;}
-  .import-btn{
-    display:flex;align-items:center;justify-content:center;gap:8px;
-    margin:8px 16px;padding:14px;border-radius:14px;
-    background:linear-gradient(135deg, rgba(168,85,247,0.2), rgba(168,85,247,0.08));
-    border:1px solid rgba(168,85,247,0.3);color:#fff;font-size:14px;font-weight:600;cursor:pointer;
-    transition:all .25s;
-  }
+  .cfg-tabs{display:flex;gap:6px;padding:4px 16px 6px;}
+  .cfg-tab{padding:6px 14px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;background:var(--glass);border:1px solid var(--border);color:var(--muted);transition:all .25s;}
+  .cfg-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .cfg-tab-content{flex:1 1 auto;overflow-y:auto;padding:0 16px 16px;scrollbar-width:none;}
+  .cfg-tab-content::-webkit-scrollbar{display:none;}
+  .import-btn{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0;padding:14px;border-radius:14px;background:linear-gradient(135deg, rgba(168,85,247,0.2), rgba(168,85,247,0.08));border:1px solid rgba(168,85,247,0.3);color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:all .25s;}
   .import-btn:active{transform:scale(0.97);}
   .import-btn svg{width:20px;height:20px;stroke:var(--glow);stroke-width:2;fill:none;stroke-linecap:round;}
-  .cfg-list-label{display:flex;justify-content:space-between;padding:8px 18px;font-size:12px;color:var(--muted);font-weight:600;}
+  .cfg-list-label{display:flex;justify-content:space-between;padding:8px 0;font-size:12px;color:var(--muted);font-weight:600;}
   .cfg-list-label .count{background:var(--glass2);border:1px solid var(--border);border-radius:8px;padding:1px 8px;color:var(--glow);}
-  #cfgListContainer{flex:1 1 auto;overflow-y:auto;padding:0 16px 16px;scrollbar-width:none;}
-  #cfgListContainer::-webkit-scrollbar{display:none;}
   .cfg-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px;}
   .cfg-item-box{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;background:var(--glass);border:1px solid var(--border);border-radius:14px;}
   .cfg-item-box.active{border-color:rgba(168,85,247,0.5);background:rgba(168,85,247,0.08);}
@@ -157,6 +154,24 @@
   .cfg-act-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--glass2);color:var(--glow);display:flex;align-items:center;justify-content:center;cursor:pointer;}
   .cfg-act-btn svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;}
   .cfg-act-btn.del{color:#FF6B6B;}
+
+  /* ===== MANUAL CONFIG FORM ===== */
+  .mc-form{padding:4px 0;}
+  .mc-field{margin-bottom:10px;}
+  .mc-field label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;padding:0 2px;}
+  .mc-field input,.mc-field select{width:100%;padding:11px 14px;border-radius:12px;background:var(--glass);border:1px solid var(--border);color:#fff;font-size:13px;font-family:inherit;outline:none;transition:border .25s;}
+  .mc-field input:focus,.mc-field select:focus{border-color:rgba(168,85,247,0.5);}
+  .mc-field input::placeholder{color:rgba(255,255,255,0.25);}
+  .mc-field select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23C77DFF' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 14px center;padding-left:34px;direction:ltr;}
+  .mc-field select option{background:#1a0a2e;color:#fff;}
+  .mc-row{display:flex;gap:8px;}
+  .mc-row .mc-field{flex:1;}
+  .mc-proto-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .mc-proto-pill{padding:7px 14px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;background:var(--glass);border:1px solid var(--border);color:var(--muted);transition:all .25s;}
+  .mc-proto-pill.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 0 12px rgba(168,85,247,0.3);}
+  .mc-save-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border-radius:14px;background:linear-gradient(135deg,#A855F7,#7C3AED);border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:all .25s;margin-top:6px;box-shadow:0 4px 16px rgba(168,85,247,0.3);}
+  .mc-save-btn:active{transform:scale(0.97);}
+  .mc-save-btn svg{width:18px;height:18px;stroke:#fff;stroke-width:2;fill:none;stroke-linecap:round;}
 
   /* ===== LOGS SCREEN ===== */
   .logs-screen{padding:0;}
@@ -279,18 +294,99 @@
   <div class="screen config-screen" id="sc-config">
     <div class="cfg-header">
       <h1>التكوين</h1>
-      <p>استورد ملف .dgvpn لتفعيل الاتصال</p>
+      <p>أنشئ كونفيغ يدوياً أو استورد ملف .dgvpn</p>
     </div>
-    <label class="import-btn" for="cfgFileInput">
-      <svg viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
-      استيراد ملف .dgvpn
-    </label>
-    <input type="file" id="cfgFileInput" accept=".dgvpn" style="display:none" onchange="handleConfigUpload(event)">
-    <div class="cfg-list-label">
-      <span>القائمة</span>
-      <span class="count" id="cfgCount">0</span>
+    <div class="cfg-tabs">
+      <div class="cfg-tab active" onclick="cfgTab('manual',this)">إنشاء يدوي</div>
+      <div class="cfg-tab" onclick="cfgTab('import',this)">استيراد</div>
+      <div class="cfg-tab" onclick="cfgTab('list',this)">القائمة</div>
     </div>
-    <div id="cfgListContainer"></div>
+    <div class="cfg-tab-content">
+      <!-- MANUAL TAB -->
+      <div id="cfgTab-manual" style="display:block">
+        <div class="mc-form">
+          <div class="mc-field">
+            <label>اسم الكونفيغ</label>
+            <input type="text" id="mcName" placeholder="سيرفري الخاص" autocomplete="off">
+          </div>
+          <label style="display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;padding:0 2px;">البروتوكول</label>
+          <div class="mc-proto-pills">
+            <div class="mc-proto-pill active" data-proto="vless" onclick="selectProto(this)">VLESS</div>
+            <div class="mc-proto-pill" data-proto="vmess" onclick="selectProto(this)">VMess</div>
+            <div class="mc-proto-pill" data-proto="trojan" onclick="selectProto(this)">Trojan</div>
+            <div class="mc-proto-pill" data-proto="ssh" onclick="selectProto(this)">SSH</div>
+            <div class="mc-proto-pill" data-proto="tcp" onclick="selectProto(this)">TCP/TLS</div>
+          </div>
+          <div class="mc-row">
+            <div class="mc-field">
+              <label>الهوست (Host)</label>
+              <input type="text" id="mcHost" placeholder="example.com" autocomplete="off" style="direction:ltr">
+            </div>
+            <div class="mc-field" style="max-width:100px">
+              <label>البورت</label>
+              <input type="number" id="mcPort" placeholder="443" style="direction:ltr">
+            </div>
+          </div>
+          <div class="mc-field" id="mcUuidField">
+            <label>UUID (لـ VLESS / VMess)</label>
+            <input type="text" id="mcUuid" placeholder="b8311384-..." autocomplete="off" style="direction:ltr">
+          </div>
+          <div class="mc-field" id="mcPassField" style="display:none">
+            <label>كلمة السر (Trojan / SSH)</label>
+            <input type="text" id="mcPass" placeholder="••••••" autocomplete="off" style="direction:ltr">
+          </div>
+          <div class="mc-field" id="mcUserField" style="display:none">
+            <label>اسم المستخدم (SSH)</label>
+            <input type="text" id="mcUser" placeholder="root" autocomplete="off" style="direction:ltr">
+          </div>
+          <div class="mc-row">
+            <div class="mc-field">
+              <label>SNI</label>
+              <input type="text" id="mcSni" placeholder="sni.example.com" autocomplete="off" style="direction:ltr">
+            </div>
+            <div class="mc-field">
+              <label>النقل (Transport)</label>
+              <select id="mcTransport">
+                <option value="tcp">TCP</option>
+                <option value="ws">WebSocket</option>
+                <option value="grpc">gRPC</option>
+              </select>
+            </div>
+          </div>
+          <div class="mc-field">
+            <label>المسار / Path (WebSocket)</label>
+            <input type="text" id="mcPath" placeholder="/ws" autocomplete="off" style="direction:ltr">
+          </div>
+          <div class="mc-field">
+            <label>Payload (SSH / TCP مخصص)</label>
+            <input type="text" id="mcPayload" placeholder="CONNECT host:443 HTTP/1.1" autocomplete="off" style="direction:ltr">
+          </div>
+          <button class="mc-save-btn" onclick="saveManualConfig()">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            حفظ وتفعيل
+          </button>
+        </div>
+      </div>
+      <!-- IMPORT TAB -->
+      <div id="cfgTab-import" style="display:none">
+        <label class="import-btn" for="cfgFileInput">
+          <svg viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
+          استيراد ملف .dgvpn
+        </label>
+        <input type="file" id="cfgFileInput" accept=".dgvpn" style="display:none" onchange="handleConfigUpload(event)">
+        <div style="text-align:center;padding:30px 10px;color:var(--muted);font-size:12px">
+          الصيغة الحصرية لـ DotGlobe VPN<br>.dgvpn — مشفرة وآمنة
+        </div>
+      </div>
+      <!-- LIST TAB -->
+      <div id="cfgTab-list" style="display:none">
+        <div class="cfg-list-label">
+          <span>القائمة</span>
+          <span class="count" id="cfgCount">0</span>
+        </div>
+        <div id="cfgListContainer"></div>
+      </div>
+    </div>
   </div>
 
   <!-- ========== SERVERS ========== -->
@@ -372,6 +468,75 @@ function goScreen(sc){
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-sc')===sc);});
 }
 function toggleSet(el){var t=el.querySelector('.toggle');if(t)t.classList.toggle('on');}
+
+// ============ CONFIG TABS ============
+function cfgTab(tab,el){
+  ['manual','import','list'].forEach(function(t){
+    var e=document.getElementById('cfgTab-'+t);if(e)e.style.display='none';
+  });
+  var target=document.getElementById('cfgTab-'+tab);
+  if(target)target.style.display='block';
+  document.querySelectorAll('.cfg-tab').forEach(function(t){t.classList.remove('active');});
+  if(el)el.classList.add('active');
+}
+
+// ============ MANUAL CONFIG PROTOCOL SELECTOR ============
+var mcProto='vless';
+function selectProto(el){
+  document.querySelectorAll('.mc-proto-pill').forEach(function(p){p.classList.remove('active');});
+  el.classList.add('active');
+  mcProto=el.getAttribute('data-proto');
+  // Show/hide fields based on protocol
+  var uuidF=document.getElementById('mcUuidField');
+  var passF=document.getElementById('mcPassField');
+  var userF=document.getElementById('mcUserField');
+  if(mcProto==='vless'||mcProto==='vmess'){
+    if(uuidF)uuidF.style.display='block';if(passF)passF.style.display='none';if(userF)userF.style.display='none';
+  }else if(mcProto==='trojan'){
+    if(uuidF)uuidF.style.display='none';if(passF)passF.style.display='block';if(userF)userF.style.display='none';
+  }else if(mcProto==='ssh'){
+    if(uuidF)uuidF.style.display='none';if(passF)passF.style.display='block';if(userF)userF.style.display='block';
+  }else if(mcProto==='tcp'){
+    if(uuidF)uuidF.style.display='none';if(passF)passF.style.display='none';if(userF)userF.style.display='none';
+  }
+}
+
+// ============ SAVE MANUAL CONFIG ============
+function saveManualConfig(){
+  var name=(document.getElementById('mcName')&&document.getElementById('mcName').value||'').trim();
+  var host=(document.getElementById('mcHost')&&document.getElementById('mcHost').value||'').trim();
+  var port=(document.getElementById('mcPort')&&document.getElementById('mcPort').value||'').trim();
+  if(!name){showToast('أدخل اسم الكونفيغ');return;}
+  if(!host){showToast('أدخل الهوست');return;}
+  if(!port){showToast('أدخل البورت');return;}
+  var uuid=(document.getElementById('mcUuid')&&document.getElementById('mcUuid').value||'').trim();
+  var pass=(document.getElementById('mcPass')&&document.getElementById('mcPass').value||'').trim();
+  var user=(document.getElementById('mcUser')&&document.getElementById('mcUser').value||'').trim();
+  var sni=(document.getElementById('mcSni')&&document.getElementById('mcSni').value||'').trim();
+  var transport=(document.getElementById('mcTransport')&&document.getElementById('mcTransport').value)||'tcp';
+  var path=(document.getElementById('mcPath')&&document.getElementById('mcPath').value||'').trim();
+  var payload=(document.getElementById('mcPayload')&&document.getElementById('mcPayload').value||'').trim();
+  // Validate based on protocol
+  if((mcProto==='vless'||mcProto==='vmess')&&!uuid){showToast('أدخل UUID');return;}
+  if(mcProto==='trojan'&&!pass){showToast('أدخل كلمة السر');return;}
+  if(mcProto==='ssh'&&!user){showToast('أدخل اسم المستخدم');return;}
+  // Build config data
+  var cfgData={app:'DotGlobe',version:'9.0',name:name,proto:mcProto,host:host,port:parseInt(port),transport:transport,dns:'1.1.1.1',payload:payload,sni:sni,user:user,pass:pass,uuid:uuid,path:path,created:new Date().toISOString()};
+  // Encrypt
+  var jsonStr=JSON.stringify(cfgData);
+  var encrypted=toBase64(xorEncrypt(jsonStr,DGVPN_KEY));
+  // Save to config list
+  var newCfg={id:Date.now(),name:name,proto:mcProto.toUpperCase(),enc:encrypted,file:name.replace(/\s+/g,'_')+'.dgvpn',date:new Date().toLocaleDateString('ar-DZ')};
+  configs.unshift(newCfg);
+  localStorage.setItem('dgvpn_configs',JSON.stringify(configs));
+  renderConfigList();
+  // Auto-activate
+  activateConfig(newCfg.id);
+  showToast('تم حفظ وتفعيل: '+name);
+  addLog('config','إنشاء كونفيغ يدوي: '+name+' ('+mcProto.toUpperCase()+')');
+  // Switch to home
+  goScreen('home');
+}
 
 // ============ SERVERS LIST ============
 var servers=[
