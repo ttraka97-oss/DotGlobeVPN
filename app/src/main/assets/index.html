@@ -54,12 +54,12 @@
     line-height:1.1;text-align:center;margin-top:2px;direction:ltr;
   }
 
-  .globe-wrap{flex:0 0 auto;display:flex;align-items:center;justify-content:center;position:relative;height:200px;margin-top:2px;}
+  .globe-wrap{flex:0 0 auto;display:flex;align-items:center;justify-content:center;position:relative;height:240px;margin-top:2px;}
   #globeCanvas{display:block;cursor:grab;touch-action:none;}
   #globeCanvas:active{cursor:grabbing;}
   #globeAtm{
-    position:absolute;width:240px;height:240px;border-radius:50%;
-    background:radial-gradient(circle, rgba(199,125,255,0.28) 0%, rgba(168,85,247,0.10) 45%, rgba(0,0,0,0) 70%);
+    position:absolute;width:260px;height:260px;border-radius:50%;
+    background:radial-gradient(circle, rgba(199,125,255,0.30) 0%, rgba(168,85,247,0.12) 45%, rgba(0,0,0,0) 70%);
     pointer-events:none;transition:opacity .6s;opacity:0.9;
   }
 
@@ -640,61 +640,133 @@ function renameConfig(id){var cfg=configs.find(function(c){return c.id===id;});i
 function deleteConfig(id){if(!confirm('حذف هذا الكونفيغ؟'))return;configs=configs.filter(function(c){return c.id!==id;});if(activeConfigId===id)activeConfigId=null;localStorage.setItem('dgvpn_configs',JSON.stringify(configs));renderConfigList();if(typeof showToast==='function')showToast('تم الحذف');}
 function escCfg(s){return String(s).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"').replace(/'/g,'&#39;');}
 
-// ============ CANVAS 2D DOT-MATRIX GLOBE (NO EXTERNAL DEPS) ============
+// ============ CANVAS 2D WIREFRAME GLOBE (NO EXTERNAL DEPS) ============
 var G=(function(){
-  var canvas,ctx,W=220,H=220,cx=110,cy=110,R=90;
-  var rotY=0,rotX=0.3;
+  var canvas,ctx,W=260,H=260,cx=130,cy=130,R=110;
+  var rotY=0,rotX=0.25;
   var dragging=false,lastX=0,lastY=0,autoRot=true;
-  var dots=[];
-  function isLand(lat,lon){
-    var regions=[
-      {la:[25,70],lo:[-170,-55]},{la:[-55,12],lo:[-82,-35]},{la:[36,71],lo:[-10,40]},
-      {la:[-35,37],lo:[-18,52]},{la:[12,42],lo:[35,63]},{la:[5,75],lo:[40,150]},
-      {la:[-10,25],lo:[95,141]},{la:[-39,-10],lo:[113,154]},{la:[60,83],lo:[-55,-20]}
-    ];
-    for(var i=0;i<regions.length;i++){var r=regions[i];if(lat>=r.la[0]&&lat<=r.la[1]&&lon>=r.lo[0]&&lon<=r.lo[1])return true;}
-    return false;
-  }
+
   function init(){
     canvas=document.getElementById('globeCanvas');if(!canvas)return;
     var dpr=Math.min(window.devicePixelRatio||1,2);
     canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
     ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
-    var target=5000;var attempts=0;
-    while(dots.length<target&&attempts<50000){
-      attempts++;var u=Math.random(),v=Math.random();
-      var theta=2*Math.PI*u;var phi=Math.acos(2*v-1);
-      var x=Math.sin(phi)*Math.cos(theta);var y=Math.cos(phi);var z=Math.sin(phi)*Math.sin(theta);
-      var lat=Math.asin(y)*180/Math.PI;var lon=Math.atan2(z,x)*180/Math.PI;
-      if(isLand(lat,lon)){var bright=0.4+Math.random()*0.2;if(lat>=18&&lat<=38&&lon>=-12&&lon<=14)bright=1.0;dots.push({x:x,y:y,z:z,bright:bright});}
-    }
     canvas.addEventListener('pointerdown',function(e){dragging=true;lastX=e.clientX;lastY=e.clientY;autoRot=false;e.preventDefault();});
     canvas.addEventListener('pointermove',function(e){if(!dragging)return;var dx=e.clientX-lastX,dy=e.clientY-lastY;rotY+=dx*0.008;rotX+=dy*0.008;rotX=Math.max(-1.2,Math.min(1.2,rotX));lastX=e.clientX;lastY=e.clientY;});
     canvas.addEventListener('pointerup',function(){dragging=false;autoRot=true;});
     canvas.addEventListener('pointerleave',function(){dragging=false;autoRot=true;});
     animate();
   }
+
+  // Project a 3D point (x,y,z) on unit sphere to 2D screen
+  function project(x,y,z){
+    // Rotate Y axis
+    var cosY=Math.cos(rotY),sinY=Math.sin(rotY);
+    var x1=x*cosY-z*sinY;var z1=x*sinY+z*cosY;var y1=y;
+    // Rotate X axis
+    var cosX=Math.cos(rotX),sinX=Math.sin(rotX);
+    var y2=y1*cosX-z1*sinX;var z2=y1*sinX+z1*cosX;var x2=x1;
+    return {px:cx+x2*R, py:cy-y2*R, z:z2};
+  }
+
   function animate(){
     requestAnimationFrame(animate);
-    if(autoRot)rotY+=state.connected?0.008:0.004;
+    if(autoRot)rotY+=state.connected?0.006:0.003;
     ctx.clearRect(0,0,W,H);
-    var ag=ctx.createRadialGradient(cx,cy,20,cx,cy,R+30);
-    ag.addColorStop(0,'rgba(168,85,247,0.0)');ag.addColorStop(0.4,'rgba(168,85,247,'+(state.connected?0.25:0.15)+')');ag.addColorStop(0.7,'rgba(168,85,247,0.05)');ag.addColorStop(1,'rgba(0,0,0,0)');
+
+    // Outer glow
+    var glowR=R+25;
+    var ag=ctx.createRadialGradient(cx,cy,R*0.5,cx,cy,glowR);
+    ag.addColorStop(0,'rgba(168,85,247,0.0)');
+    ag.addColorStop(0.6,'rgba(168,85,247,'+(state.connected?0.20:0.12)+')');
+    ag.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=ag;ctx.fillRect(0,0,W,H);
-    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fillStyle='#05000a';ctx.fill();
-    var cosX=Math.cos(rotX),sinX=Math.sin(rotX);var cosY=Math.cos(rotY),sinY=Math.sin(rotY);
-    var projected=[];
-    for(var i=0;i<dots.length;i++){
-      var d=dots[i];var x1=d.x*cosY-d.z*sinY;var z1=d.x*sinY+d.z*cosY;var y1=d.y;
-      var y2=y1*cosX-z1*sinX;var z2=y1*sinX+z1*cosX;var x2=x1;
-      if(z2>-0.3){var scale=R;var px=cx+x2*scale;var py=cy-y2*scale;var depth=(z2+1)/2;var size=0.8+depth*1.5;var alpha=d.bright*(0.3+depth*0.7);projected.push({px:px,py:py,size:size,alpha:alpha,bright:d.bright});}
+
+    // Highlight gradient on sphere (upper-right light source)
+    var hlx=cx+R*0.4, hly=cy-R*0.35;
+    var hg=ctx.createRadialGradient(hlx,hly,5,cx,cy,R);
+    hg.addColorStop(0,'rgba(199,125,255,0.12)');
+    hg.addColorStop(0.5,'rgba(168,85,247,0.04)');
+    hg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=hg;
+    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fill();
+
+    // === Draw longitude lines (meridians) ===
+    var numLong=12;
+    for(var li=0;li<numLong;li++){
+      var lon=li*Math.PI*2/numLong;
+      var pts=[];
+      for(var la=-Math.PI/2;la<=Math.PI/2;la+=Math.PI/30){
+        var x=Math.cos(la)*Math.cos(lon);
+        var y=Math.sin(la);
+        var z=Math.cos(la)*Math.sin(lon);
+        var p=project(x,y,z);
+        pts.push(p);
+      }
+      // Draw line segments
+      for(var j=0;j<pts.length-1;j++){
+        var p1=pts[j],p2=pts[j+1];
+        var avgZ=(p1.z+p2.z)/2;
+        var depth=(avgZ+1)/2;
+        var alpha=0.08+depth*0.35;
+        if(avgZ<-0.1) alpha*=0.3; // dim back lines
+        ctx.beginPath();ctx.moveTo(p1.px,p1.py);ctx.lineTo(p2.px,p2.py);
+        ctx.strokeStyle='rgba(168,85,247,'+alpha+')';
+        ctx.lineWidth=0.8;ctx.stroke();
+      }
     }
-    for(var i=0;i<projected.length;i++){
-      var p=projected[i];var color;
-      if(p.bright>=0.9){color='rgba(199,125,255,'+p.alpha+')';}else{color='rgba(168,85,247,'+p.alpha+')';}
-      ctx.beginPath();ctx.arc(p.px,p.py,p.size,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+
+    // === Draw latitude lines (parallels) ===
+    var numLat=8;
+    for(var li=1;li<numLat;li++){
+      var lat=-Math.PI/2+li*Math.PI/numLat;
+      var pts=[];
+      for(var lon=0;lon<=Math.PI*2;lon+=Math.PI/30){
+        var x=Math.cos(lat)*Math.cos(lon);
+        var y=Math.sin(lat);
+        var z=Math.cos(lat)*Math.sin(lon);
+        var p=project(x,y,z);
+        pts.push(p);
+      }
+      for(var j=0;j<pts.length-1;j++){
+        var p1=pts[j],p2=pts[j+1];
+        var avgZ=(p1.z+p2.z)/2;
+        var depth=(avgZ+1)/2;
+        var alpha=0.08+depth*0.35;
+        if(avgZ<-0.1) alpha*=0.3;
+        ctx.beginPath();ctx.moveTo(p1.px,p1.py);ctx.lineTo(p2.px,p2.py);
+        ctx.strokeStyle='rgba(168,85,247,'+alpha+')';
+        ctx.lineWidth=0.8;ctx.stroke();
+      }
     }
-    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.strokeStyle='rgba(199,125,255,'+(state.connected?0.3:0.15)+')';ctx.lineWidth=1;ctx.stroke();
+
+    // === Draw dots at intersections ===
+    for(var li=0;li<numLong;li++){
+      var lon=li*Math.PI*2/numLong;
+      for(var la=-Math.PI/2+Math.PI/numLat;la<Math.PI/2;la+=Math.PI/numLat){
+        var x=Math.cos(la)*Math.cos(lon);
+        var y=Math.sin(la);
+        var z=Math.cos(la)*Math.sin(lon);
+        var p=project(x,y,z);
+        if(p.z>-0.3){
+          var depth=(p.z+1)/2;
+          var size=1+depth*1.2;
+          var alpha=0.3+depth*0.6;
+          ctx.beginPath();ctx.arc(p.px,p.py,size,0,Math.PI*2);
+          ctx.fillStyle='rgba(199,125,255,'+alpha+')';
+          ctx.fill();
+        }
+      }
+    }
+
+    // === Rim glow ===
+    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);
+    ctx.strokeStyle='rgba(199,125,255,'+(state.connected?0.5:0.3)+')';
+    ctx.lineWidth=1.5;ctx.stroke();
+    // Inner rim glow
+    ctx.beginPath();ctx.arc(cx,cy,R-1,0,Math.PI*2);
+    ctx.strokeStyle='rgba(168,85,247,'+(state.connected?0.2:0.1)+')';
+    ctx.lineWidth=3;ctx.stroke();
   }
   return {init:init};
 })();
