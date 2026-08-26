@@ -1,10 +1,9 @@
 package com.dotglobe.vpn
 
 import android.util.Log
-import com.jcraft.jsch.ChannelDirectTCP
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
-import com.jcraft.jsch.SocksProxy
+import com.jcraft.jsch.ChannelDirectTCPIP
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetAddress
@@ -164,7 +163,7 @@ class SshTunnel {
 
         // Create SSH direct TCP channel
         try {
-            val channel = session?.openChannel("direct-tcp") as? ChannelDirectTCP
+            val channel = session?.openChannel("direct-tcp") as? ChannelDirectTCPIP
             channel?.setHost(dstHost)
             channel?.setPort(dstPort)
             channel?.connect(10000)

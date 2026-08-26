@@ -182,7 +182,7 @@ class DotGlobeVpnService : VpnService() {
                 val dstBytes = dstAddr.toByteArray()
                 val request = ByteBuffer.allocate(7 + dstBytes.size)
                 request.put(5) // version
-                request.put(1) // connect
+                request.put(1.toByte()) // connect
                 request.put(0) // reserved
                 request.put(3) // domain
                 request.put(dstBytes.size.toByte())
