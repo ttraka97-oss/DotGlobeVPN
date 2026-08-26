@@ -25,6 +25,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Security check at startup
+        SecurityCheck.runSecurityCheck(this)
+
         webView = WebView(this)
         setContentView(webView)
 
