@@ -42,6 +42,10 @@ android {
             excludes += "/META-INF/io.netty.versions.properties"
         }
     }
+
+    androidResources {
+        noCompress.addAll(listOf("xray", "dat", "geoip.dat", "geosite.dat"))
+    }
 }
 
 configurations.all {

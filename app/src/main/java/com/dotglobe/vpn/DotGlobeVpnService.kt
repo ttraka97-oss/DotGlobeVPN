@@ -25,6 +25,7 @@ class DotGlobeVpnService : VpnService() {
     private var trojanTunnel: TrojanTunnel? = null
     private var v2rayTunnel: V2RayTunnel? = null
     private var tcpTlsTunnel: TcpTlsTunnel? = null
+    private var xrayRunner: XrayRunner? = null
     private var currentConfig: ConfigParser.VpnConfig? = null
 
     companion object {
@@ -54,57 +55,25 @@ class DotGlobeVpnService : VpnService() {
         if (isRunning) return
 
         val proto = config.proto.lowercase()
-        Log.i("DotGlobeVPN", "Protocol: $proto")
+        Log.i("DotGlobeVPN", "Protocol: $proto · Using Xray-core")
 
-        val callback = object : SshTunnel.TunnelCallback {
-            override fun onConnected() { establishVpnInterface(config) }
-            override fun onDisconnected() { stopVpn() }
-            override fun onError(message: String) { Log.e("DotGlobeVPN", message); stopVpn() }
-            override fun onLog(message: String) { Log.i("DotGlobeVPN", message) }
-            override fun onStats(download: Long, upload: Long) {}
-        }
-
-        when (proto) {
-            "ssh" -> {
-                sshTunnel = SshTunnel()
-                sshTunnel?.connect(config, callback)
+        // Use Xray-core for all protocols (VMess, VLESS, Trojan, TCP/TLS, SSH)
+        xrayRunner = XrayRunner(this)
+        xrayRunner?.start(config, object : XrayRunner.XrayCallback {
+            override fun onConnected(socksPort: Int) {
+                establishVpnInterface(config)
             }
-            "trojan" -> {
-                trojanTunnel = TrojanTunnel()
-                trojanTunnel?.connect(config, object : TrojanTunnel.TunnelCallback {
-                    override fun onConnected() { establishVpnInterface(config) }
-                    override fun onDisconnected() { stopVpn() }
-                    override fun onError(message: String) { Log.e("DotGlobeVPN", message); stopVpn() }
-                    override fun onLog(message: String) { Log.i("DotGlobeVPN", message) }
-                    override fun onStats(download: Long, upload: Long) {}
-                })
+            override fun onDisconnected() {
+                stopVpn()
             }
-            "vmess", "vless", "v2ray" -> {
-                v2rayTunnel = V2RayTunnel()
-                v2rayTunnel?.connect(config, object : V2RayTunnel.TunnelCallback {
-                    override fun onConnected() { establishVpnInterface(config) }
-                    override fun onDisconnected() { stopVpn() }
-                    override fun onError(message: String) { Log.e("DotGlobeVPN", message); stopVpn() }
-                    override fun onLog(message: String) { Log.i("DotGlobeVPN", message) }
-                    override fun onStats(download: Long, upload: Long) {}
-                })
+            override fun onError(message: String) {
+                Log.e("DotGlobeVPN", "Xray error: $message")
+                stopVpn()
             }
-            "tcp", "tls", "tcp/tls" -> {
-                tcpTlsTunnel = TcpTlsTunnel()
-                tcpTlsTunnel?.connect(config, object : TcpTlsTunnel.TunnelCallback {
-                    override fun onConnected() { establishVpnInterface(config) }
-                    override fun onDisconnected() { stopVpn() }
-                    override fun onError(message: String) { Log.e("DotGlobeVPN", message); stopVpn() }
-                    override fun onLog(message: String) { Log.i("DotGlobeVPN", message) }
-                    override fun onStats(download: Long, upload: Long) {}
-                })
+            override fun onLog(message: String) {
+                Log.i("DotGlobeVPN", message)
             }
-            else -> {
-                // Default: try SSH
-                sshTunnel = SshTunnel()
-                sshTunnel?.connect(config, callback)
-            }
-        }
+        })
     }
 
     private fun establishVpnInterface(config: ConfigParser.VpnConfig) {
@@ -175,7 +144,8 @@ class DotGlobeVpnService : VpnService() {
                     )
 
                     val protocol = packet[9].toInt() and 0xFF
-                    val socksPort = sshTunnel?.getSocksPort()
+                    val socksPort = xrayRunner?.getSocksPort()
+                        ?: sshTunnel?.getSocksPort()
                         ?: trojanTunnel?.getSocksPort()
                         ?: v2rayTunnel?.getSocksPort()
                         ?: tcpTlsTunnel?.getSocksPort()
@@ -252,10 +222,12 @@ class DotGlobeVpnService : VpnService() {
 
     private fun stopVpn() {
         isRunning = false
+        try { xrayRunner?.stop() } catch (_: Exception) {}
         try { sshTunnel?.disconnect() } catch (_: Exception) {}
         try { trojanTunnel?.disconnect() } catch (_: Exception) {}
         try { v2rayTunnel?.disconnect() } catch (_: Exception) {}
         try { tcpTlsTunnel?.disconnect() } catch (_: Exception) {}
+        xrayRunner = null
         sshTunnel = null
         trojanTunnel = null
         v2rayTunnel = null
