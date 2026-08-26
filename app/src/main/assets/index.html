@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>DotGlobe VPN — v9</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg-0:#0D0015; --bg-1:#1A0B2E; --bg-2:#2D1B4E;
+    --accent:#9D4EDD; --glow:#C77DFF;
+    --glass:rgba(255,255,255,0.04);
+    --glass-2:rgba(255,255,255,0.06);
+    --border:rgba(157,78,221,0.15);
+    --border-strong:rgba(157,78,221,0.30);
+    --text:#FFFFFF; --muted:rgba(255,255,255,0.5);
+    --green:#34C759; --red:#FF3B30; --orange:#FF9500;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;font-family:-apple-system,'SF Pro Display','Cairo',sans-serif;color:var(--text);}
+  body{
+    background:radial-gradient(160% 120% at 50% 0%, #2D1B4E 0%, #1A0B2E 45%, #0D0015 100%);
+    position:fixed;inset:0;
+  }
+  .app{position:relative;width:100%;height:100%;max-width:440px;margin:0 auto;overflow:hidden;}
+  ::-webkit-scrollbar{display:none;}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;padding:env(safe-area-inset-top,12px) 0 88px;opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .4s cubic-bezier(.22,1,.36,1),transform .4s cubic-bezier(.22,1,.36,1),visibility .4s;overflow-y:auto;}
+  .screen.active{opacity:1;visibility:visible;transform:translateY(0);}
+
+  /* Status bar */
+  .statusbar{display:flex;justify-content:space-between;align-items:center;padding:12px 20px 6px;font-size:13px;font-weight:600;letter-spacing:.3px;}
+  .statusbar .brand{font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;}
+  .statusbar .brand b{color:var(--glow);font-weight:700;}
+
+  /* Glass card */
+  .glass{background:var(--glass);border:1px solid var(--border);border-radius:18px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.05),0 8px 32px rgba(0,0,0,0.3);}
+
+  /* ============ HOME ============ */
+  .home-top{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 20px 0;}
+  .status-text{font-size:15px;font-weight:600;letter-spacing:.2px;}
+  .status-sub{font-size:12px;color:var(--muted);letter-spacing:.2px;}
+  .timer{font-family:'SF Mono',ui-monospace,Menlo,monospace;font-size:30px;font-weight:600;letter-spacing:2px;text-shadow:0 0 18px rgba(199,125,255,0.35);margin-top:2px;}
+
+  .globe-wrap{position:relative;width:240px;height:240px;margin:6px auto 2px;display:flex;align-items:center;justify-content:center;}
+  #globeCanvas{width:240px;height:240px;border-radius:50%;cursor:grab;touch-action:none;}
+  #globeCanvas:active{cursor:grabbing;}
+  .globe-atm{position:absolute;width:262px;height:262px;border-radius:50%;background:radial-gradient(circle,rgba(199,125,255,0.10) 0%,rgba(157,78,221,0.05) 45%,transparent 70%);pointer-events:none;filter:blur(6px);transition:opacity .6s ease;}
+
+  /* Server pill */
+  .server-pill{display:inline-flex;align-items:center;gap:8px;margin:4px auto 0;padding:7px 14px;border-radius:999px;}
+  .server-pill .flag-dot{width:14px;height:14px;border-radius:4px;flex:none;box-shadow:0 0 0 1px rgba(255,255,255,0.12);}
+  .server-pill .sname{font-size:13px;font-weight:600;letter-spacing:.2px;}
+  .server-pill .ping{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;}
+
+  /* Power button */
+  .power-wrap{display:flex;justify-content:center;margin:14px 0 6px;position:relative;}
+  .power-btn{position:relative;width:88px;height:88px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .3s cubic-bezier(.22,1,.36,1);z-index:2;}
+  .power-btn:active{transform:scale(0.94);}
+  .power-ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,#3A2A5C,#9D4EDD,#C77DFF,#9D4EDD,#3A2A5C);padding:2px;box-shadow:0 0 24px rgba(157,78,221,0.35);transition:box-shadow .5s ease,filter .5s ease;}
+  .power-inner{position:relative;width:100%;height:100%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2A1A45 0%,#160A28 80%);display:flex;align-items:center;justify-content:center;}
+  .power-inner svg{width:34px;height:34px;stroke:rgba(255,255,255,0.85);stroke-width:2;fill:none;stroke-linecap:round;}
+  .power-orbit{position:absolute;inset:-8px;border-radius:50%;border:1.5px solid transparent;opacity:0;transition:opacity .5s ease;}
+  .power-btn.connecting .power-ring{animation:pulseRing 1.4s ease-in-out infinite;}
+  .power-btn.connecting .power-inner{animation:pulseInner 1.4s ease-in-out infinite;}
+  .power-btn.connected .power-ring{box-shadow:0 0 36px rgba(199,125,255,0.6),0 0 64px rgba(157,78,221,0.3);filter:brightness(1.15);}
+  .power-btn.connected .power-orbit{opacity:1;border-color:rgba(199,125,255,0.4);animation:spinRing 3s linear infinite;}
+  @keyframes pulseRing{0%,100%{box-shadow:0 0 18px rgba(157,78,221,0.35);}50%{box-shadow:0 0 44px rgba(199,125,255,0.7),0 0 80px rgba(157,78,221,0.35);}}
+  @keyframes pulseInner{0%,100%{filter:brightness(1);}50%{filter:brightness(1.4);}}
+  @keyframes spinRing{to{transform:rotate(360deg);}}
+
+  /* Activity graph */
+  .activity{margin:10px 18px 0;padding:12px 14px;}
+  .activity-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .activity-head .t{font-size:11px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;}
+  .activity-head .v{font-size:11px;font-weight:600;color:var(--glow);font-variant-numeric:tabular-nums;}
+  #activityCanvas{width:100%;height:56px;display:block;}
+
+  /* Stats grid */
+  .stats{margin:12px 18px 0;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .stat{padding:12px 14px;display:flex;flex-direction:column;gap:3px;}
+  .stat .lbl{font-size:10.5px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;}
+  .stat .val{font-size:16px;font-weight:700;letter-spacing:.2px;font-variant-numeric:tabular-nums;}
+  .stat .sub{font-size:10.5px;color:var(--muted);}
+
+  /* Quick pills */
+  .quick{display:flex;gap:8px;overflow-x:auto;padding:12px 18px 16px;-ms-overflow-style:none;scrollbar-width:none;}
+  .quick::-webkit-scrollbar{display:none;}
+  .quick-pill{flex:none;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;}
+  .quick-pill .dot{width:8px;height:8px;border-radius:50%;}
+
+  /* ============ BOTTOM NAV ============ */
+  .nav{position:absolute;bottom:0;left:0;right:0;height:78px;padding-bottom:env(safe-area-inset-bottom,0);display:flex;justify-content:space-around;align-items:flex-start;padding-top:10px;background:rgba(13,0,21,0.72);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-top:1px solid var(--border);z-index:50;}
+  .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:var(--muted);transition:color .3s ease;position:relative;padding:4px 0;}
+  .nav-btn svg{width:24px;height:24px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;transition:transform .3s cubic-bezier(.22,1,.36,1);}
+  .nav-btn .lbl{font-size:9.5px;font-weight:600;letter-spacing:.3px;}
+  .nav-btn.active{color:var(--glow);}
+  .nav-btn.active svg{filter:drop-shadow(0 0 8px rgba(199,125,255,0.6));}
+  .nav-btn.active::before{content:'';position:absolute;top:-10px;width:4px;height:4px;border-radius:50%;background:var(--glow);box-shadow:0 0 8px var(--glow);}
+  .nav-btn:active svg{transform:translateY(-2px);}
+
+  /* ============ ONBOARDING ============ */
+  .onboard{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:0 30px;text-align:center;gap:0;}
+  .onboard .logo{width:96px;height:96px;border-radius:50%;background:conic-gradient(from 0deg,#3A2A5C,#9D4EDD,#C77DFF,#9D4EDD,#3A2A5C);padding:2px;margin-bottom:22px;box-shadow:0 0 40px rgba(157,78,221,0.4);animation:spinRing 8s linear infinite;}
+  .onboard .logo .inner{width:100%;height:100%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2A1A45,#160A28);display:flex;align-items:center;justify-content:center;}
+  .onboard .logo svg{width:44px;height:44px;}
+  .onboard h1{font-size:30px;font-weight:700;letter-spacing:-.4px;margin-bottom:8px;}
+  .onboard h1 span{color:var(--glow);}
+  .onboard p{font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:30px;max-width:300px;}
+  .onboard .features{display:flex;flex-direction:column;gap:12px;margin-bottom:34px;width:100%;}
+  .onboard .feat{display:flex;align-items:center;gap:12px;padding:12px 14px;}
+  .onboard .feat .ic{width:32px;height:32px;border-radius:9px;background:rgba(157,78,221,0.12);display:flex;align-items:center;justify-content:center;flex:none;}
+  .onboard .feat .ic svg{width:18px;height:18px;stroke:var(--glow);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+  .onboard .feat .ft{font-size:13px;font-weight:600;}
+  .onboard .feat .fs{font-size:11px;color:var(--muted);}
+  .onboard .start{width:100%;padding:15px;border-radius:14px;border:none;background:linear-gradient(135deg,#9D4EDD,#7B2CBF);color:#fff;font-size:15px;font-weight:700;letter-spacing:.3px;box-shadow:0 8px 28px rgba(157,78,221,0.4);cursor:pointer;transition:transform .2s ease;}
+  .onboard .start:active{transform:scale(0.97);}
+
+  /* ============ GENERIC SCREENS ============ */
+  .sheader{padding:14px 20px 10px;}
+  .sheader h2{font-size:24px;font-weight:700;letter-spacing:-.3px;}
+  .sheader p{font-size:12px;color:var(--muted);margin-top:2px;}
+
+  /* Servers */
+  .srv-search{margin:0 18px 8px;padding:10px 14px;display:flex;align-items:center;gap:8px;}
+  .srv-search svg{width:16px;height:16px;stroke:var(--muted);stroke-width:1.7;fill:none;stroke-linecap:round;}
+  .srv-search input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;}
+  .srv-list{padding:0 18px 16px;display:flex;flex-direction:column;gap:8px;}
+  .srv-item{padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:transform .2s ease,background .3s ease;}
+  .srv-item:active{transform:scale(0.98);background:var(--glass-2);}
+  .srv-item .fd{width:28px;height:28px;border-radius:8px;flex:none;box-shadow:0 0 0 1px rgba(255,255,255,0.1);}
+  .srv-item .info{flex:1;min-width:0;}
+  .srv-item .nm{font-size:13px;font-weight:600;}
+  .srv-item .ct{font-size:11px;color:var(--muted);}
+  .srv-item .meta{text-align:left;font-size:11px;}
+  .srv-item .meta .ms{color:var(--muted);}
+  .srv-item .meta .ld{font-weight:600;font-variant-numeric:tabular-nums;}
+  .srv-item .check{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border-strong);flex:none;display:flex;align-items:center;justify-content:center;}
+  .srv-item.selected .check{background:var(--accent);border-color:var(--accent);}
+  .srv-item.selected .check svg{width:10px;height:10px;stroke:#fff;stroke-width:2.5;fill:none;}
+
+  /* Config */
+  .cfg-section{padding:0 18px 16px;}
+  .cfg-card{padding:14px;margin-bottom:10px;}
+  .cfg-card .ctitle{font-size:12px;font-weight:700;letter-spacing:.3px;margin-bottom:10px;display:flex;align-items:center;gap:7px;}
+  .cfg-card .ctitle svg{width:15px;height:15px;stroke:var(--glow);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+  .cfg-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+  .cfg-row:last-child{border-bottom:none;}
+  .cfg-row .k{font-size:13px;}
+  .cfg-row .k .muted{font-size:10.5px;color:var(--muted);display:block;}
+  .cfg-row .v{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .toggle{position:relative;width:42px;height:24px;border-radius:999px;background:rgba(255,255,255,0.1);cursor:pointer;transition:background .3s ease;flex:none;}
+  .toggle.on{background:var(--accent);}
+  .toggle .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .3s cubic-bezier(.22,1,.36,1);box-shadow:0 2px 6px rgba(0,0,0,0.3);}
+  .toggle.on .knob{transform:translateX(18px);}
+  .cfg-btn{width:100%;padding:13px;border-radius:12px;border:1px solid var(--border-strong);background:var(--glass);color:var(--text);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;margin-top:6px;transition:background .3s;}
+  .cfg-btn:active{background:var(--glass-2);}
+  .cfg-btn.primary{background:linear-gradient(135deg,rgba(157,78,221,0.3),rgba(123,44,191,0.2));border-color:var(--accent);}
+
+  /* Logs */
+  .logs-toolbar{display:flex;gap:8px;padding:0 18px 12px;}
+  .logs-toolbar .chip{flex:1;padding:7px;text-align:center;font-size:11px;font-weight:600;border-radius:10px;cursor:pointer;transition:background .3s;}
+  .logs-toolbar .chip.active{background:var(--accent);color:#fff;}
+  .logs-list{padding:0 18px 16px;display:flex;flex-direction:column;gap:6px;}
+  .log-item{padding:10px 12px;display:flex;align-items:flex-start;gap:10px;}
+  .log-item .dot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex:none;}
+  .log-item .body{flex:1;min-width:0;}
+  .log-item .msg{font-size:12px;font-weight:500;}
+  .log-item .ts{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;}
+
+  /* Settings */
+  .set-list{padding:0 18px 16px;}
+  .set-group{margin-bottom:16px;}
+  .set-group .gtitle{font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;padding:0 4px 8px;}
+  .set-item{padding:13px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.04);}
+  .set-item:last-child{border-bottom:none;}
+  .set-item:active{background:var(--glass-2);}
+  .set-item .ic{width:30px;height:30px;border-radius:8px;background:rgba(157,78,221,0.12);display:flex;align-items:center;justify-content:center;flex:none;}
+  .set-item .ic svg{width:16px;height:16px;stroke:var(--glow);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+  .set-item .lbl{flex:1;}
+  .set-item .lbl .t{font-size:13px;font-weight:600;}
+  .set-item .lbl .s{font-size:11px;color:var(--muted);}
+  .set-item .arr{color:var(--muted);}
+  .set-item .arr svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+  .set-foot{text-align:center;padding:20px;font-size:11px;color:var(--muted);line-height:1.6;}
+  .set-foot b{color:var(--glow);}
+
+  .fade-in{animation:fadeIn .5s cubic-bezier(.22,1,.36,1);}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ========== ONBOARDING ========== -->
+  <div class="screen active" id="sc-onboard">
+    <div class="onboard">
+      <div class="logo"><div class="inner"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#C77DFF" stroke-width="1.8"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18" stroke="#9D4EDD" stroke-width="1.5" stroke-linecap="round"/></svg></div></div>
+      <h1>DotGlobe <span>VPN</span></h1>
+      <p>اتصال آمن وسريع حول العالم. خصوصية كاملة، سرعة عالية، وحماية لا تُكسر.</p>
+      <div class="features">
+        <div class="feat glass"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg></div><div><div class="ft">تشفير عسكري AES-256</div><div class="fs">حماية بياناتك بأعلى المعايير</div></div></div>
+        <div class="feat glass"><div class="ic"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg></div><div><div class="ft">سرعة فائقة</div><div class="fs">خوادم في أكثر من 50 دولة</div></div></div>
+        <div class="feat glass"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div><div class="ft">بدون سجلات</div><div class="fs">سياسة عدم الاحتفاظ بالسجلات</div></div></div>
+      </div>
+      <button class="start" onclick="goScreen('home')">ابدأ الآن</button>
+    </div>
+  </div>
+
+  <!-- ========== HOME ========== -->
+  <div class="screen" id="sc-home">
+    <div class="statusbar"><span class="brand">ALPHA > GO</span><span id="clock">--:--</span></div>
+    <div class="home-top">
+      <div class="status-text" id="statusText">غير متصل</div>
+      <div class="status-sub" id="statusSub">اضغط زر الطاقة للاتصال</div>
+      <div class="timer" id="timer">00:00:00</div>
+    </div>
+    <div class="globe-wrap">
+      <div class="globe-atm" id="globeAtm"></div>
+      <canvas id="globeCanvas"></canvas>
+    </div>
+    <div class="glass server-pill" id="serverPill">
+      <div class="flag-dot" id="flagDot" style="background:linear-gradient(135deg,#EE1C25,#FFB300);"></div>
+      <span class="sname" id="serverName">اليابان — طوكيو</span>
+      <span class="ping" id="serverPing">38ms</span>
+    </div>
+    <div class="power-wrap">
+      <button class="power-btn" id="powerBtn" onclick="toggleVPN()">
+        <div class="power-orbit"></div>
+        <div class="power-ring"><div class="power-inner">
+          <svg viewBox="0 0 24 24"><path d="M12 3v10M7.5 6.5a7 7 0 1 0 9 0"/></svg>
+        </div></div>
+      </button>
+    </div>
+    <div class="glass speed-panel" id="speedPanel">
+      <div class="speed-row">
+        <div class="speed-item">
+          <div class="speed-icon dl"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-6a2 2 0 0 0-2 2v8"/><path d="M14 6l4 4-4 4"/><path d="M8 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8"/></svg></div>
+          <div class="speed-info">
+            <div class="speed-label">تحميل</div>
+            <div class="speed-value" id="dlSpeed">0.0 <span>KB/s</span></div>
+          </div>
+        </div>
+        <div class="speed-divider"></div>
+        <div class="speed-item">
+          <div class="speed-icon ul"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14h6a2 2 0 0 0 2-2V4"/><path d="M10 18l-4-4 4-4"/><path d="M16 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-8"/></svg></div>
+          <div class="speed-info">
+            <div class="speed-label">رفع</div>
+            <div class="speed-value" id="ulSpeed">0.0 <span>KB/s</span></div>
+          </div>
+        </div>
+      </div>
+      <canvas id="speedGraph" class="speed-graph"></canvas>
+      <div class="speed-meta">
+        <div class="speed-meta-item"><span class="dot session"></span>الجلسة: <b id="sessionData">0 KB</b></div>
+        <div class="speed-meta-item"><span class="dot peak"></span>ذروة: <b id="peakSpeed">0 KB/s</b></div>
+      </div>
+    </div>
+    <div class="glass activity">
+      <div class="activity-head"><span class="t">النشاط اليوم</span><span class="v" id="actVal">1.24 GB</span></div>
+      <canvas id="activityCanvas"></canvas>
+    </div>
+    <div class="stats">
+      <div class="glass stat"><span class="lbl">البيانات</span><span class="val" id="stData">2.4 GB</span><span class="sub">من 10 GB</span></div>
+      <div class="glass stat"><span class="lbl">مدة الاتصال</span><span class="val" id="stTime">04:32:18</span><span class="sub">اليوم</span></div>
+      <div class="glass stat"><span class="lbl">آخر خادم</span><span class="val" id="stSrv" style="font-size:13px;">طوكيو</span><span class="sub">JP</span></div>
+      <div class="glass stat"><span class="lbl">الاتصالات</span><span class="val" id="stConn">127</span><span class="sub">إجمالي</span></div>
+    </div>
+    <div class="quick" id="quickPills"></div>
+  </div>
+
+  <!-- ========== SERVERS ========== -->
+  <div class="screen" id="sc-servers">
+    <div class="statusbar"><span class="brand">الخوادم</span><span id="clock2">--:--</span></div>
+    <div class="sheader"><h2>اختر الموقع</h2><p>أكثر من 50 خادمًا حول العالم</p></div>
+    <div class="glass srv-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="بحث عن خادم..." oninput="filterServers(this.value)"></div>
+    <div class="srv-list" id="srvList"></div>
+  </div>
+
+  <!-- ========== CONFIG ========== -->
+  <div class="screen" id="sc-config">
+    <div class="statusbar"><span class="brand">إدارة الكونفيغ</span><span id="clock3">--:--</span></div>
+    <div class="sheader"><h2>الكونفيغات</h2><p>صيغة DotGlobe الحصرية — .dgvpn</p></div>
+    <div class="cfg-section">
+
+      <!-- BIG IMPORT BUTTON -->
+      <div class="glass cfg-upload-zone" id="cfgUploadZone" onclick="document.getElementById('cfgFileInput').click()">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+        <div style="font-size:18px;font-weight:700;color:#fff;margin-top:14px">استيراد كونفيغ</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.4);margin-top:6px">اضغط هنا لاختيار ملف .dgvpn</div>
+        <div style="font-size:11px;color:rgba(157,78,221,0.6);margin-top:4px">صيغة DotGlobe الحصرية — مشفر وجاهز</div>
+      </div>
+      <input type="file" id="cfgFileInput" accept=".dgvpn,application/octet-stream" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden" onchange="handleConfigUpload(event)">
+
+      <!-- CONFIG LIST (always visible) -->
+      <div class="cfg-list-header" style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px">
+        <span style="font-size:14px;font-weight:600;color:#fff">الكونفيغات المحفوظة</span>
+        <span style="font-size:12px;color:rgba(255,255,255,0.4)" id="cfgCount">0</span>
+      </div>
+      <div id="cfgListContainer"></div>
+
+    </div>
+  </div>
+
+  <style>
+  .cfg-tabs{display:flex;gap:8px;margin-bottom:16px}
+  .cfg-tab{flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(157,78,221,0.15);border-radius:12px;padding:12px;font-family:inherit;font-size:13px;font-weight:600;color:rgba(255,255,255,0.5);cursor:pointer;transition:.25s;text-align:center}
+  .cfg-tab.active{background:linear-gradient(135deg,rgba(157,78,221,0.2),rgba(199,125,255,0.1));border-color:var(--accent2);color:#fff}
+  .cfg-tab:active{transform:scale(.97)}
+  .cfg-panel{animation:fadeIn .3s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .cfg-input{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(157,78,221,0.15);border-radius:12px;padding:13px 15px;color:#fff;font-family:inherit;font-size:14px;outline:none;margin-bottom:10px;box-sizing:border-box;transition:.2s}
+  .cfg-input:focus{border-color:var(--accent2);background:rgba(157,78,221,0.05)}
+  .cfg-input::placeholder{color:rgba(255,255,255,0.25)}
+  .cfg-select{flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(157,78,221,0.15);border-radius:12px;padding:13px 15px;color:#fff;font-family:inherit;font-size:13px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none}
+  .cfg-select option{background:#1a0a2e;color:#fff}
+  .cfg-field-row{display:flex;gap:8px;margin-bottom:10px}
+  .cfg-export-btn{width:100%;background:linear-gradient(135deg,#9D4EDD,#7B2CBF);color:#fff;border:none;border-radius:14px;padding:16px;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;transition:.25s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px}
+  .cfg-export-btn:active{transform:scale(.97)}
+  .cfg-upload-zone{border:2px dashed rgba(157,78,221,0.25);border-radius:18px;padding:32px 20px;text-align:center;cursor:pointer;transition:.3s;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-bottom:8px}
+  .cfg-upload-zone:hover{border-color:var(--accent2);background:rgba(157,78,221,0.06)}
+  .cfg-upload-zone:active{transform:scale(.97)}
+  .cfg-item-box{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(157,78,221,0.15);border-radius:14px;padding:14px;margin-bottom:10px;transition:.25s}
+  .cfg-item-box:active{transform:scale(.98)}
+  .cfg-item-box.active{border-color:var(--accent2);background:rgba(157,78,221,0.12)}
+  .cfg-item-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,rgba(157,78,221,0.2),rgba(199,125,255,0.1));display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .cfg-item-icon svg{width:20px;height:20px;stroke:var(--accent2);fill:none;stroke-width:1.5}
+  .cfg-item-info{flex:1;min-width:0}
+  .cfg-item-name{font-size:14px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cfg-item-meta{font-size:11px;color:rgba(255,255,255,0.4);margin-top:3px;display:flex;gap:8px;align-items:center}
+  .cfg-item-meta .tag{padding:2px 8px;border-radius:8px;background:rgba(157,78,221,0.15);color:var(--accent2);font-size:10px;font-weight:500}
+  .cfg-item-meta .enc{color:#34C759;font-size:10px;display:flex;align-items:center;gap:3px}
+  .cfg-item-actions{display:flex;gap:6px;flex-shrink:0}
+  .cfg-act-btn{width:32px;height:32px;border-radius:10px;border:none;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s}
+  .cfg-act-btn:active{transform:scale(.85)}
+  .cfg-act-btn svg{width:16px;height:16px;stroke:rgba(255,255,255,0.5);fill:none;stroke-width:1.5}
+  .cfg-act-btn.del svg{stroke:#FF6B6B}
+  .cfg-empty{text-align:center;padding:40px 20px;color:rgba(255,255,255,0.3);font-size:13px}
+
+  .speed-panel{padding:16px;border-radius:20px;margin:0 0 10px;opacity:0.5;transition:.4s}
+  .speed-panel.active{opacity:1}
+  .speed-row{display:flex;align-items:center;gap:0}
+  .speed-item{flex:1;display:flex;align-items:center;gap:12px;padding:4px 8px}
+  .speed-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .speed-icon.dl{background:linear-gradient(135deg,rgba(0,122,255,0.15),rgba(0,122,255,0.05));color:#007AFF}
+  .speed-icon.ul{background:linear-gradient(135deg,rgba(255,159,10,0.15),rgba(255,159,10,0.05));color:#FF9500}
+  .speed-info{flex:1;min-width:0}
+  .speed-label{font-size:11px;color:rgba(255,255,255,0.4);font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+  .speed-value{font-size:20px;font-weight:700;color:#fff;margin-top:2px;font-variant-numeric:tabular-nums;letter-spacing:-0.5px}
+  .speed-value span{font-size:11px;font-weight:400;color:rgba(255,255,255,0.4)}
+  .speed-divider{width:1px;height:36px;background:rgba(255,255,255,0.08)}
+  .speed-graph{width:100%;height:64px;margin-top:12px;display:block}
+  .speed-meta{display:flex;gap:16px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06)}
+  .speed-meta-item{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,0.4)}
+  .speed-meta-item b{color:rgba(255,255,255,0.7);font-weight:600}
+  .speed-meta-item .dot{width:7px;height:7px;border-radius:50%}
+  .speed-meta-item .dot.session{background:#34C759}
+  .speed-meta-item .dot.peak{background:#FF9500}
+
+  /* ============ LUXURY ENHANCEMENTS ============ */
+  /* Animated gradient mesh background */
+  body::before{
+    content:'';position:fixed;inset:0;z-index:-1;
+    background:
+      radial-gradient(ellipse 600px 400px at 20% 10%, rgba(157,78,221,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 500px 500px at 80% 90%, rgba(199,125,255,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 400px 300px at 50% 50%, rgba(58,42,92,0.05) 0%, transparent 70%);
+    animation:meshShift 12s ease-in-out infinite alternate;
+  }
+  @keyframes meshShift{
+    0%{transform:scale(1) rotate(0deg);opacity:0.8}
+    100%{transform:scale(1.1) rotate(2deg);opacity:1}
+  }
+
+  /* Gold shimmer accent on brand */
+  .statusbar .brand b{
+    background:linear-gradient(135deg,#C77DFF 0%,#FFD700 50%,#C77DFF 100%);
+    background-size:200% auto;
+    -webkit-background-clip:text;
+    background-clip:text;
+    -webkit-text-fill-color:transparent;
+    animation:shimmerText 4s linear infinite;
+  }
+  @keyframes shimmerText{
+    0%{background-position:0% center}
+    100%{background-position:200% center}
+  }
+
+  /* Premium glass cards with border glow */
+  .glass{
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.06),0 8px 32px rgba(0,0,0,0.3),0 0 0 1px rgba(157,78,221,0.05);
+    transition:transform .3s cubic-bezier(.22,1,.36,1),box-shadow .3s ease;
+  }
+  .glass:active{
+    transform:scale(0.985);
+  }
+
+  /* Timer with gradient gold/purple */
+  .timer{
+    background:linear-gradient(135deg,#FFFFFF 0%,#C77DFF 50%,#FFD700 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    -webkit-text-fill-color:transparent;
+    text-shadow:none;
+    filter:drop-shadow(0 0 20px rgba(199,125,255,0.3));
+  }
+
+  /* Status text premium */
+  .status-text{
+    text-shadow:0 2px 12px rgba(199,125,255,0.15);
+  }
+
+  /* Power button premium upgrade */
+  .power-btn .power-ring{
+    background:conic-gradient(from 0deg,#3A2A5C,#9D4EDD,#C77DFF,#FFD700,#C77DFF,#9D4EDD,#3A2A5C);
+    background-size:200% 100%;
+    animation:rotateGradient 6s linear infinite;
+  }
+  @keyframes rotateGradient{
+    0%{background-position:0% 0%}
+    100%{background-position:200% 0%}
+  }
+  .power-btn.connected .power-ring{
+    box-shadow:0 0 40px rgba(199,125,255,0.5),0 0 80px rgba(157,78,221,0.25),0 0 120px rgba(255,215,0,0.1);
+  }
+  .power-orbit{
+    border-image:linear-gradient(135deg,rgba(199,125,255,0.6),rgba(255,215,0,0.2)) 1;
+  }
+
+  /* Globe atmosphere premium glow */
+  .globe-atm{
+    background:radial-gradient(circle,rgba(199,125,255,0.12) 0%,rgba(157,78,221,0.06) 40%,rgba(255,215,0,0.02) 60%,transparent 75%);
+    animation:atmPulse 5s ease-in-out infinite;
+  }
+  @keyframes atmPulse{
+    0%,100%{transform:scale(1);opacity:0.9}
+    50%{transform:scale(1.04);opacity:1}
+  }
+
+  /* Server pill premium */
+  .server-pill{
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05),0 4px 20px rgba(157,78,221,0.15);
+    transition:all .3s ease;
+  }
+  .server-pill:active{transform:scale(0.96)}
+  .server-pill .flag-dot{
+    box-shadow:0 0 0 1px rgba(255,255,255,0.12),0 0 12px rgba(255,215,0,0.15);
+  }
+
+  /* Stat cards premium */
+  .stat{
+    position:relative;overflow:hidden;
+  }
+  .stat::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(199,125,255,0.4),transparent);
+  }
+  .stat .val{
+    background:linear-gradient(135deg,#FFFFFF,#E0D0FF);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+
+  /* Activity graph premium */
+  .activity::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(199,125,255,0.5),rgba(255,215,0,0.2),transparent);
+  }
+
+  /* Quick pills premium */
+  .quick-pill{
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.04);
+    transition:all .25s ease;
+  }
+  .quick-pill:active{transform:scale(0.94)}
+
+  /* Bottom nav premium */
+  .nav{
+    box-shadow:0 -1px 0 rgba(157,78,221,0.08),0 -20px 40px rgba(0,0,0,0.4);
+  }
+  .nav-btn.active::after{
+    content:'';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);
+    width:24px;height:3px;border-radius:2px;
+    background:linear-gradient(90deg,#9D4EDD,#C77DFF,#FFD700);
+    box-shadow:0 0 10px rgba(199,125,255,0.5);
+  }
+
+  /* Screen headers premium */
+  .sheader h2{
+    background:linear-gradient(135deg,#FFFFFF 0%,#C77DFF 100%);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    text-shadow:none;
+  }
+
+  /* Upload zone premium */
+  .cfg-upload-zone{
+    position:relative;overflow:hidden;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05),0 8px 32px rgba(0,0,0,0.3);
+  }
+  .cfg-upload-zone::before{
+    content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
+    background:linear-gradient(45deg,transparent 40%,rgba(199,125,255,0.06) 50%,transparent 60%);
+    animation:shimmerZone 4s ease-in-out infinite;
+  }
+  @keyframes shimmerZone{
+    0%,100%{transform:translateX(-100%) translateY(-100%)}
+    50%{transform:translateX(100%) translateY(100%)}
+  }
+
+  /* Config list items premium */
+  .cfg-item-box{
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+  .cfg-item-box.active{
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.06),0 0 20px rgba(157,78,221,0.15);
+  }
+  .cfg-item-icon{
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.1),0 4px 12px rgba(157,78,221,0.1);
+  }
+
+  /* Speed panel premium */
+  .speed-panel.active{
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.06),0 8px 32px rgba(0,0,0,0.3),0 0 40px rgba(157,78,221,0.08);
+  }
+  .speed-value{
+    background:linear-gradient(135deg,#FFFFFF,#E0D0FF);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+
+  /* Server list premium */
+  .srv-item{
+    transition:all .25s ease;
+  }
+  .srv-item:active{
+    transform:scale(0.98);
+  }
+
+  /* Toast premium */
+  #dgToast{
+    background:rgba(26,11,46,0.92)!important;
+    border:1px solid rgba(199,125,255,0.3)!important;
+    box-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.08),0 0 20px rgba(157,78,221,0.15)!important;
+  }
+
+  /* Log entries premium */
+  .log-entry{
+    transition:all .25s ease;
+  }
+
+  /* Premium scroll reveal for screens */
+  .screen.active{
+    animation:screenReveal .5s cubic-bezier(.22,1,.36,1);
+  }
+  @keyframes screenReveal{
+    from{opacity:0;transform:translateY(12px) scale(0.99)}
+    to{opacity:1;transform:translateY(0) scale(1)}
+  }
+
+  </style>
+
+
+
+  <!-- ========== LOGS ========== -->
+  <div class="screen" id="sc-logs">
+    <div class="statusbar"><span class="brand">السجلات</span><span id="clock4">--:--</span></div>
+    <div class="sheader"><h2>سجل النشاط</h2><p>آخر الأحداث والاتصالات</p></div>
+    <div class="logs-toolbar">
+      <div class="chip active" onclick="filterLogs('all',this)">الكل</div>
+      <div class="chip" onclick="filterLogs('info',this)">معلومات</div>
+      <div class="chip" onclick="filterLogs('warn',this)">تحذيرات</div>
+      <div class="chip" onclick="filterLogs('config',this)">تكوين</div>
+    </div>
+    <div class="logs-list" id="logsList"></div>
+  </div>
+
+  <!-- ========== SETTINGS ========== -->
+  <div class="screen" id="sc-settings">
+    <div class="statusbar"><span class="brand">الإعدادات</span><span id="clock5">--:--</span></div>
+    <div class="sheader"><h2>الإعدادات</h2><p>تخصيص التطبيق</p></div>
+    <div class="set-list">
+      <div class="set-group">
+        <div class="gtitle">عام</div>
+        <div class="glass">
+          <div class="set-item" onclick="toggleSet(this)"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 4 10v4M12 3a6 6 0 0 1-4 10v4M9 21h6"/></svg></div><div class="lbl"><div class="t">الاتصال التلقائي</div><div class="s">عند بدء التشغيل</div></div><div class="toggle on"><div class="knob"></div></div></div>
+          <div class="set-item" onclick="toggleSet(this)"><div class="ic"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4"/></svg></div><div class="lbl"><div class="t">الإشعارات</div><div class="s">تنبيهات الاتصال</div></div><div class="toggle on"><div class="knob"></div></div></div>
+          <div class="set-item" onclick="toggleSet(this)"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM14 14h6v6h-6zM4 14h6v6H4z"/></svg></div><div class="lbl"><div class="t">بدء تلقائي</div><div class="s">مع النظام</div></div><div class="toggle"><div class="knob"></div></div></div>
+        </div>
+      </div>
+      <div class="set-group">
+        <div class="gtitle">المظهر واللمس</div>
+        <div class="glass">
+          <div class="set-item" onclick="toggleSet(this)"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M3 12h3M18 12h3M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg></div><div class="lbl"><div class="t">الوضع الداكن</div><div class="s">مفعّل دائمًا</div></div><div class="toggle on"><div class="knob"></div></div></div>
+          <div class="set-item" onclick="toggleSet(this)"><div class="ic"><svg viewBox="0 0 24 24"><path d="M3 12c2-4 6-4 9-4s7 0 9 4c-2 4-6 4-9 4s-7 0-9-4z"/><path d="M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0z"/></svg></div><div class="lbl"><div class="t">الاهتزاز</div><div class="s">عند الاتصال</div></div><div class="toggle on"><div class="knob"></div></div></div>
+          <div class="set-item" onclick="toggleSet(this)"><div class="ic"><svg viewBox="0 0 24 24"><path d="M3 9v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2zM7 12h2M11 12h6"/></svg></div><div class="lbl"><div class="t">تأثيرات الحركة</div><div class="s">انتقالات ورسوم</div></div><div class="toggle on"><div class="knob"></div></div></div>
+        </div>
+      </div>
+      <div class="set-group">
+        <div class="gtitle">حول</div>
+        <div class="glass">
+          <div class="set-item"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg></div><div class="lbl"><div class="t">الإصدار</div><div class="s">DotGlobe VPN v8.0</div></div><div class="arr"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+          <div class="set-item"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg></div><div class="lbl"><div class="t">المطور</div><div class="s">islem</div></div><div class="arr"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+          <div class="set-item" onclick="addLog('info','تم التحقق من التحديثات')"><div class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9M21 3v6h-6"/><path d="M12 8v4l3 2"/></svg></div><div class="lbl"><div class="t">التحقق من التحديثات</div><div class="s">الإصدار الأحدث</div></div><div class="arr"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="set-foot">DotGlobe VPN v8.0 · <b>islem</b><br><b>@islem_store10</b> · ALPHA > GO</div>
+  </div>
+
+  <!-- ========== BOTTOM NAV ========== -->
+  <div class="nav" id="nav">
+    <button class="nav-btn active" data-sc="home" onclick="goScreen('home')"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span class="lbl">الرئيسية</span></button>
+    <button class="nav-btn" data-sc="servers" onclick="goScreen('servers')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg><span class="lbl">الخوادم</span></button>
+    <button class="nav-btn" data-sc="config" onclick="goScreen('config')"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg><span class="lbl">التكوين</span></button>
+    <button class="nav-btn" data-sc="logs" onclick="goScreen('logs')"><svg viewBox="0 0 24 24"><path d="M8 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8M8 3H5a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h3M8 3v18"/><path d="M11 8h6M11 12h6M11 16h4"/></svg><span class="lbl">السجلات</span></button>
+    <button class="nav-btn" data-sc="settings" onclick="goScreen('settings')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span class="lbl">الإعدادات</span></button>
+  </div>
+</div>
+
+<script>
+// ============ STATE ============
+var state = {connected:false, connecting:false, elapsed:0, current:'اليابان — طوكيو', ping:'38ms', code:'JP', flag:'linear-gradient(135deg,#EE1C25,#FFB300)'};
+var logFilter='all';
+var logs=[];
+var servers=[
+  {nm:'اليابان — طوكيو',ct:'آسيا',ms:38,code:'JP',flag:'linear-gradient(135deg,#EE1C25,#FFB300)'},
+  {nm:'سنغافورة',ct:'آسيا',ms:52,code:'SG',flag:'linear-gradient(135deg,#ED2939,#FFFFFF)'},
+  {nm:'الإمارات — دبي',ct:'الشرق الأوسط',ms:24,code:'AE',flag:'linear-gradient(135deg,#00732F,#FF0000)'},
+  {nm:'ألمانيا — فرانكفورت',ct:'أوروبا',ms:67,code:'DE',flag:'linear-gradient(135deg,#000,#DD0000)'},
+  {nm:'هولندا — أمستردام',ct:'أوروبا',ms:71,code:'NL',flag:'linear-gradient(135deg,#AE1C28,#21468B)'},
+  {nm:'المملكة المتحدة — لندن',ct:'أوروبا',ms:79,code:'UK',flag:'linear-gradient(135deg,#012169,#C8102E)'},
+  {nm:'الولايات المتحدة — نيويورك',ct:'أمريكا',ms:112,code:'US',flag:'linear-gradient(135deg,#3C3B6E,#B22234)'},
+  {nm:'الولايات المتحدة — لوس أنجلس',ct:'أمريكا',ms:128,code:'US2',flag:'linear-gradient(135deg,#3C3B6E,#B22234)'},
+  {nm:'كندا — تورنتو',ct:'أمريكا',ms:104,code:'CA',flag:'linear-gradient(135deg,#FF0000,#FFFFFF)'},
+  {nm:'فرنسا — باريس',ct:'أوروبا',ms:74,code:'FR',flag:'linear-gradient(135deg,#0055A4,#EF4135)'},
+  {nm:'الهند — مومباي',ct:'آسيا',ms:18,code:'IN',flag:'linear-gradient(135deg,#FF9933,#138808)'},
+  {nm:'كوريا — سيول',ct:'آسيا',ms:44,code:'KR',flag:'linear-gradient(135deg,#CD2E3A,#0047A0)'}
+];
+
+// ============ NAVIGATION ============
+function goScreen(sc){
+  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
+  document.getElementById('sc-'+sc).classList.add('active');
+  document.getElementById('sc-'+sc).classList.add('fade-in');
+  setTimeout(function(){document.getElementById('sc-'+sc).classList.remove('fade-in');},500);
+  document.querySelectorAll('.nav-btn').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-sc')===sc);
+  });
+  if(sc==='servers') renderServers();
+}
+function toggleSet(el){ var t=el.querySelector('.toggle'); if(t) t.classList.toggle('on'); }
+
+// ============ CLOCK ============
+function tickClock(){
+  var d=new Date(), h=String(d.getHours()).padStart(2,'0'), m=String(d.getMinutes()).padStart(2,'0');
+  var t=h+':'+m;
+  ['clock','clock2','clock3','clock4','clock5'].forEach(function(id){var e=document.getElementById(id); if(e) e.textContent=t;});
+}
+setInterval(tickClock,1000); tickClock();
+
+// ============ TIMER ============
+function fmt(s){var h=String(Math.floor(s/3600)).padStart(2,'0'),m=String(Math.floor(s%3600/60)).padStart(2,'0'),x=String(s%60).padStart(2,'0');return h+':'+m+':'+x;}
+setInterval(function(){
+  if(state.connected){state.elapsed++; document.getElementById('timer').textContent=fmt(state.elapsed); document.getElementById('stTime').textContent=fmt(state.elapsed);}
+},1000);
+
+// ============ VPN TOGGLE ============
+function toggleVPN(){
+  if(state.connecting) return;
+  if(!state.connected){
+    state.connecting=true;
+    var btn=document.getElementById('powerBtn');
+    btn.classList.add('connecting');
+    document.getElementById('statusText').textContent='جاري الاتصال...';
+    document.getElementById('statusSub').textContent='تمهيد القناة المشفرة';
+    vibrate(30);
+    addLog('info','بدء الاتصال بـ '+state.current);
+    setTimeout(function(){
+      state.connecting=false; state.connected=true;
+      btn.classList.remove('connecting'); btn.classList.add('connected');
+      document.getElementById('statusText').textContent='متصل';
+      document.getElementById('statusSub').textContent='الاتصال آمن ومشفّر';
+      document.getElementById('globeAtm').style.opacity='1.6';
+      vibrate([20,40,40]);
+      addLog('info','تم الاتصال · IP مشفر · '+state.ping);
+      animateActivity();
+      startSpeedTracking();
+    },2600);
+  } else {
+    state.connected=false; state.elapsed=0;
+    var btn=document.getElementById('powerBtn');
+    btn.classList.remove('connected');
+    document.getElementById('statusText').textContent='غير متصل';
+    document.getElementById('statusSub').textContent='اضغط زر الطاقة للاتصال';
+    document.getElementById('timer').textContent='00:00:00';
+    document.getElementById('globeAtm').style.opacity='';
+    vibrate(40);
+    addLog('warn','تم قطع الاتصال');
+    stopSpeedTracking();
+    sessionBytes = 0;
+    peakSpeedVal = 0;
+  }
+}
+function vibrate(p){ if(navigator.vibrate){ try{navigator.vibrate(p);}catch(e){} } }
+
+// ============ SERVERS ============
+function renderServers(filter){
+  filter=filter||'';
+  var list=document.getElementById('srvList'); list.innerHTML='';
+  servers.filter(function(s){return s.nm.indexOf(filter)>-1 || s.ct.indexOf(filter)>-1;}).forEach(function(s){
+    var sel = s.nm===state.current;
+    var d=document.createElement('div');
+    d.className='glass srv-item'+(sel?' selected':'');
+    d.innerHTML='<div class="fd" style="background:'+s.flag+'"></div>'+
+      '<div class="info"><div class="nm">'+s.nm+'</div><div class="ct">'+s.ct+' · '+s.code+'</div></div>'+
+      '<div class="meta"><div class="ms">زمن الاستجابة</div><div class="ld">'+s.ms+'ms</div></div>'+
+      '<div class="check">'+(sel?'<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-9"/></svg>':'')+'</div>';
+    d.onclick=function(){selectServer(s);};
+    list.appendChild(d);
+  });
+}
+function selectServer(s){
+  state.current=s.nm; state.ping=s.ms+'ms'; state.code=s.code; state.flag=s.flag;
+  document.getElementById('serverName').textContent=s.nm;
+  document.getElementById('serverPing').textContent=s.ms+'ms';
+  document.getElementById('flagDot').style.background=s.flag;
+  document.getElementById('stSrv').textContent=s.nm.split('—')[0].trim();
+  renderServers();
+  vibrate(20);
+  addLog('config','تم اختيار الخادم '+s.nm);
+  goScreen('home');
+}
+function filterServers(v){ renderServers(v); }
+
+// ============ QUICK PILLS ============
+function renderQuick(){
+  var qp=document.getElementById('quickPills'); qp.innerHTML='';
+  var cols={'موصى به':'#34C759','سريع':'#9D4EDD','بث':'#FF9500','ألعاب':'#5AC8FA','تورنت':'#FFD60A'};
+  Object.keys(cols).forEach(function(k){
+    var d=document.createElement('div');
+    d.className='glass quick-pill';
+    d.innerHTML='<span class="dot" style="background:'+cols[k]+'"></span>'+k;
+    qp.appendChild(d);
+  });
+}
+renderQuick();
+
+// ============ LOGS ============
+function addLog(type,msg){
+  var d=new Date(), t=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+  logs.unshift({type:type,msg:msg,ts:t});
+  if(logs.length>60) logs.pop();
+  renderLogs();
+}
+function renderLogs(){
+  var list=document.getElementById('logsList'); if(!list) return;
+  list.innerHTML='';
+  var colors={info:'#9D4EDD',warn:'#FF9500',config:'#34C759'};
+  logs.filter(function(l){return logFilter==='all'||l.type===logFilter;}).forEach(function(l){
+    var d=document.createElement('div'); d.className='glass log-item';
+    d.innerHTML='<div class="dot" style="background:'+(colors[l.type]||'#9D4EDD')+'"></div><div class="body"><div class="msg">'+l.msg+'</div><div class="ts">'+l.ts+'</div></div>';
+    list.appendChild(d);
+  });
+}
+function filterLogs(t,el){
+  logFilter=t;
+  document.querySelectorAll('.logs-toolbar .chip').forEach(function(c){c.classList.remove('active');});
+  el.classList.add('active');
+  renderLogs();
+}
+addLog('info','تم تشغيل DotGlobe VPN v8');
+addLog('config','تحميل التكوين المشفر');
+
+
+// ============ LIVE SPEED GRAPH ============
+var speedHistory = new Array(60).fill(0);
+var speedHistoryUL = new Array(60).fill(0);
+var speedInterval = null;
+var sessionBytes = 0;
+var peakSpeedVal = 0;
+
+function startSpeedTracking(){
+  var panel = document.getElementById('speedPanel');
+  if(panel) panel.classList.add('active');
+  if(speedInterval) clearInterval(speedInterval);
+  speedInterval = setInterval(function(){
+    var dlBase = 15 + Math.random() * 80;
+    var ulBase = 3 + Math.random() * 25;
+    if(Math.random() > 0.7){ dlBase += 50 + Math.random() * 100; }
+    if(Math.random() > 0.85){ ulBase += 10 + Math.random() * 20; }
+    var dlSpeed = dlBase;
+    var ulSpeed = ulBase;
+    speedHistory.push(dlSpeed); speedHistory.shift();
+    speedHistoryUL.push(ulSpeed); speedHistoryUL.shift();
+    sessionBytes += dlSpeed * 1024;
+    if(dlSpeed > peakSpeedVal) peakSpeedVal = dlSpeed;
+    var dlEl = document.getElementById('dlSpeed');
+    var ulEl = document.getElementById('ulSpeed');
+    var sessEl = document.getElementById('sessionData');
+    var peakEl = document.getElementById('peakSpeed');
+    if(dlEl) dlEl.innerHTML = formatSpeed(dlSpeed);
+    if(ulEl) ulEl.innerHTML = formatSpeed(ulSpeed);
+    if(sessEl) sessEl.textContent = formatBytes(sessionBytes);
+    if(peakEl) peakEl.textContent = formatSpeedRaw(peakSpeedVal);
+    drawSpeedGraph();
+  }, 1000);
+}
+
+function stopSpeedTracking(){
+  var panel = document.getElementById('speedPanel');
+  if(panel) panel.classList.remove('active');
+  if(speedInterval){ clearInterval(speedInterval); speedInterval = null; }
+  var dlEl = document.getElementById('dlSpeed');
+  var ulEl = document.getElementById('ulSpeed');
+  if(dlEl) dlEl.innerHTML = '0.0 <span>KB/s</span>';
+  if(ulEl) ulEl.innerHTML = '0.0 <span>KB/s</span>';
+  speedHistory = new Array(60).fill(0);
+  speedHistoryUL = new Array(60).fill(0);
+  drawSpeedGraph();
+}
+
+function formatSpeed(kb){
+  if(kb > 1024) return (kb/1024).toFixed(1) + ' <span>MB/s</span>';
+  return kb.toFixed(1) + ' <span>KB/s</span>';
+}
+
+function formatSpeedRaw(kb){
+  if(kb > 1024) return (kb/1024).toFixed(1) + ' MB/s';
+  return kb.toFixed(0) + ' KB/s';
+}
+
+function formatBytes(bytes){
+  if(bytes > 1048576) return (bytes/1048576).toFixed(1) + ' MB';
+  if(bytes > 1024) return (bytes/1024).toFixed(0) + ' KB';
+  return Math.round(bytes) + ' B';
+}
+
+function drawSpeedGraph(){
+  var c = document.getElementById('speedGraph');
+  if(!c) return;
+  var dpr = window.devicePixelRatio || 1;
+  var w = c.clientWidth, h = c.clientHeight;
+  if(w === 0 || h === 0) return;
+  c.width = w * dpr; c.height = h * dpr;
+  var ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+  var maxVal = Math.max.apply(null, speedHistory.concat([10]));
+  maxVal = Math.max(maxVal, 10);
+  var bw = w / speedHistory.length;
+  for(var i = 0; i < speedHistory.length; i++){
+    var bh = (speedHistory[i] / maxVal) * (h * 0.85);
+    var bhUL = (speedHistoryUL[i] / maxVal) * (h * 0.5);
+    var x = i * bw;
+    var y = h - bh;
+    var grad = ctx.createLinearGradient(0, y, 0, h);
+    grad.addColorStop(0, 'rgba(0,122,255,0.9)');
+    grad.addColorStop(1, 'rgba(0,122,255,0.1)');
+    ctx.fillStyle = grad;
+    var barW = Math.max(bw - 1.5, 1);
+    ctx.beginPath();
+    if(ctx.roundRect){
+      ctx.roundRect(x, y, barW, bh, 2);
+    } else {
+      ctx.rect(x, y, barW, bh);
+    }
+    ctx.fill();
+    var yUL = h - bhUL;
+    ctx.fillStyle = 'rgba(255,159,10,0.6)';
+    ctx.beginPath();
+    if(ctx.roundRect){
+      ctx.roundRect(x, yUL, barW, bhUL, 2);
+    } else {
+      ctx.rect(x, yUL, barW, bhUL);
+    }
+    ctx.fill();
+  }
+}
+
+
+function showToast(msg){
+  var t = document.getElementById('dgToast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'dgToast';
+    t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(157,78,221,0.95);color:#fff;padding:12px 24px;border-radius:14px;font-size:13px;font-weight:600;z-index:9999;transition:opacity .3s;opacity:0;backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(0,0,0,0.3)';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.style.opacity = '0'; }, 2500);
+}
+/* ============ CONFIG UPLOAD SYSTEM ============ */
+var configs = JSON.parse(localStorage.getItem('dgvpn_configs') || '[]');
+var activeConfigId = null;
+
+function renderConfigList(){
+  var c = document.getElementById('cfgListContainer');
+  var count = document.getElementById('cfgCount');
+  if(!c) return;
+  if(count) count.textContent = configs.length;
+  if(!configs.length){
+    c.innerHTML = '<div class="cfg-empty">لا توجد كونفيغات<br><span style="font-size:11px;opacity:0.6">استورد ملف .dgvpn من صاحب القناة</span></div>';
+    return;
+  }
+  c.innerHTML = configs.map(function(cfg){
+    var isActive = activeConfigId === cfg.id;
+    return '<div class="cfg-item-box' + (isActive ? ' active' : '') + '">' +
+      '<div class="cfg-item-icon"><svg viewBox="0 0 24 24"><path d="M14 3v4h4M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z M9 13h6M9 17h4"/></svg></div>' +
+      '<div class="cfg-item-info">' +
+        '<div class="cfg-item-name">' + escCfg(cfg.name) + '</div>' +
+        '<div class="cfg-item-meta">' +
+          '<span class="tag">' + (cfg.proto || 'WireGuard') + '</span>' +
+          '<span class="enc"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>مشفر</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="cfg-item-actions">' +
+        '<button class="cfg-act-btn" onclick="activateConfig(' + cfg.id + ')" title="تفعيل"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></button>' +
+        '<button class="cfg-act-btn" onclick="renameConfig(' + cfg.id + ')" title="إعادة تسمية"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></button>' +
+        '<button class="cfg-act-btn del" onclick="deleteConfig(' + cfg.id + ')" title="حذف"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function handleConfigUpload(event){
+  var file = event.target.files[0];
+  if(!file) return;
+  if(!file.name.endsWith('.dgvpn')){
+    if(typeof showToast === 'function') showToast('صيغة غير مدعومة — .dgvpn فقط');
+    else alert('صيغة غير مدعومة — .dgvpn فقط');
+    event.target.value = '';
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var content = e.target.result;
+    var cfgName = file.name.replace(/\.[^.]+$/, '');
+    var proto = 'WireGuard';
+    var encData = content;
+    var isValid = false;
+    try{
+      var data = JSON.parse(content);
+      if(data.type === 'DotGlobe-VPN'){
+        isValid = true;
+        if(data.name) cfgName = data.name;
+        if(data.proto) proto = data.proto;
+        if(data.enc) encData = data.enc;
+      }
+    }catch(err){}
+    if(!isValid){
+      if(typeof showToast === 'function') showToast('ملف .dgvpn غير صالح');
+      else alert('ملف .dgvpn غير صالح');
+      return;
+    }
+    var customName = prompt('سمّي الكونفيغ باش ما يتخلطش:', cfgName);
+    if(customName !== null && customName.trim()) cfgName = customName.trim();
+    var newCfg = {
+      id: Date.now(),
+      name: cfgName,
+      proto: proto,
+      enc: encData,
+      file: file.name,
+      date: new Date().toLocaleDateString('ar-DZ')
+    };
+    configs.unshift(newCfg);
+    localStorage.setItem('dgvpn_configs', JSON.stringify(configs));
+    renderConfigList();
+    if(typeof showToast === 'function') showToast('تم استيراد: ' + cfgName);
+    if(typeof addLog === 'function') addLog('config', 'استيراد كونفيغ: ' + cfgName);
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+/* ============ CREATE + EXPORT .dgvpn ============ */
+var DGVPN_KEY = 'DotGlobeVPN_2026_ALPHA_GO_islem';
+
+function xorEncrypt(text, key){
+  var result = '';
+  for(var i = 0; i < text.length; i++){
+    result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  }
+  return result;
+}
+
+function toBase64(str){
+  return btoa(unescape(encodeURIComponent(str)));
+}
+
+function fromBase64(b64){
+  return decodeURIComponent(escape(atob(b64)));
+}
+
+function exportDarkFile(){
+  var name = document.getElementById('cfgName').value.trim();
+  var host = document.getElementById('cfgHost').value.trim();
+  var port = document.getElementById('cfgPort').value.trim();
+  
+  if(!name){ if(typeof showToast === 'function') showToast('أدخل اسم الكونفيغ'); else alert('أدخل اسم الكونفيغ'); return; }
+  if(!host){ if(typeof showToast === 'function') showToast('أدخل عنوان الخادم'); else alert('أدخل عنوان الخادم'); return; }
+  if(!port){ if(typeof showToast === 'function') showToast('أدخل المنفذ'); else alert('أدخل المنفذ'); return; }
+  
+  var cfgData = {
+    app: 'DotGlobe',
+    version: '9.0',
+    name: name,
+    proto: document.getElementById('cfgProto').value,
+    host: host,
+    port: parseInt(port),
+    transport: document.getElementById('cfgTransport').value,
+    dns: document.getElementById('cfgDns').value,
+    payload: document.getElementById('cfgPayload').value,
+    sni: document.getElementById('cfgSni').value,
+    user: document.getElementById('cfgUser').value,
+    pass: document.getElementById('cfgPass').value,
+    created: new Date().toISOString()
+  };
+  
+  var jsonStr = JSON.stringify(cfgData);
+  var encrypted = toBase64(xorEncrypt(jsonStr, DGVPN_KEY));
+  
+  var darkContent = JSON.stringify({
+    type: 'DotGlobe-VPN',
+    version: '9.0',
+    enc: encrypted
+  }, null, 2);
+  
+  var blob = new Blob([darkContent], {type: 'application/octet-stream'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = name.replace(/\s+/g, '_') + '.dgvpn';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  var newCfg = {
+    id: Date.now(),
+    name: name,
+    proto: cfgData.proto,
+    enc: encrypted,
+    file: name.replace(/\s+/g, '_') + '.dgvpn',
+    date: new Date().toLocaleDateString('ar-DZ')
+  };
+  configs.unshift(newCfg);
+  localStorage.setItem('dgvpn_configs', JSON.stringify(configs));
+  renderConfigList();
+  
+  if(typeof showToast === 'function') showToast('تم تصدير: ' + name + '.dgvpn');
+  if(typeof addLog === 'function') addLog('config', 'تصدير كونفيغ: ' + name + '.dgvpn');
+}
+
+
+/* Handle .dgvpn file opened from outside the app */
+function handleImportedFile(content){
+  try{
+    var data = JSON.parse(content);
+    if(data.type !== 'DotGlobe-VPN'){
+      if(typeof showToast === 'function') showToast('ملف .dgvpn غير صالح');
+      return;
+    }
+    var cfgName = data.name || 'Config';
+    var proto = data.proto || 'WireGuard';
+    var encData = data.enc || content;
+    var customName = prompt('سمّي الكونفيغ باش ما يتخلطش:', cfgName);
+    if(customName !== null && customName.trim()) cfgName = customName.trim();
+    var newCfg = {
+      id: Date.now(),
+      name: cfgName,
+      proto: proto,
+      enc: encData,
+      file: cfgName + '.dgvpn',
+      date: new Date().toLocaleDateString('ar-DZ')
+    };
+    configs.unshift(newCfg);
+    localStorage.setItem('dgvpn_configs', JSON.stringify(configs));
+    renderConfigList();
+    if(typeof showToast === 'function') showToast('تم استيراد: ' + cfgName);
+    if(typeof addLog === 'function') addLog('config', 'استيراد كونفيغ: ' + cfgName);
+  }catch(err){
+    if(typeof showToast === 'function') showToast('ملف .dgvpn غير صالح');
+  }
+}
+
+renderConfigList();
+
+function activateConfig(id){
+  activeConfigId = id;
+  var cfg = configs.find(function(c){ return c.id === id; });
+  if(cfg){
+    renderConfigList();
+    if(typeof showToast === 'function') showToast('تم تفعيل: ' + cfg.name);
+    if(typeof addLog === 'function') addLog('config', 'تفعيل: ' + cfg.name);
+  }
+}
+
+function renameConfig(id){
+  var cfg = configs.find(function(c){ return c.id === id; });
+  if(!cfg) return;
+  var newName = prompt('الاسم الجديد:', cfg.name);
+  if(newName !== null && newName.trim()){
+    cfg.name = newName.trim();
+    localStorage.setItem('dgvpn_configs', JSON.stringify(configs));
+    renderConfigList();
+    if(typeof showToast === 'function') showToast('تم تغيير الاسم');
+  }
+}
+
+function deleteConfig(id){
+  if(!confirm('حذف هذا الكونفيغ؟')) return;
+  configs = configs.filter(function(c){ return c.id !== id; });
+  if(activeConfigId === id) activeConfigId = null;
+  localStorage.setItem('dgvpn_configs', JSON.stringify(configs));
+  renderConfigList();
+  if(typeof showToast === 'function') showToast('تم الحذف');
+}
+
+function escCfg(s){
+  return String(s).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"').replace(/'/g,'&#39;');
+}
+
+renderConfigList();
+addLog('info','الخادم الافتراضي: اليابان — طوكيو');
+
+// ============ ACTIVITY GRAPH ============
+var actData=[];
+for(var i=0;i<24;i++) actData.push(Math.random()*0.7+0.2);
+function animateActivity(){ for(var i=0;i<24;i++) actData[i]=Math.random()*0.7+0.2+0.1; drawActivity(); }
+function drawActivity(){
+  var c=document.getElementById('activityCanvas'); if(!c) return;
+  var dpr=window.devicePixelRatio||1;
+  var w=c.clientWidth, h=c.clientHeight;
+  c.width=w*dpr; c.height=h*dpr;
+  var ctx=c.getContext('2d'); ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  var bw=w/actData.length;
+  var grad=ctx.createLinearGradient(0,0,0,h);
+  grad.addColorStop(0,'rgba(199,125,255,0.9)');
+  grad.addColorStop(1,'rgba(157,78,221,0.2)');
+  actData.forEach(function(v,i){
+    var bh=v*h;
+    ctx.fillStyle=grad;
+    var x=i*bw+bw*0.2, y=h-bh, bw2=bw*0.6;
+    ctx.beginPath();
+    var r=Math.min(bw2/2,3);
+    ctx.moveTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.lineTo(x+bw2-r,y); ctx.arcTo(x+bw2,y,x+bw2,y+r,r); ctx.lineTo(x+bw2,y); ctx.lineTo(x,y); ctx.closePath(); ctx.fill();
+  });
+}
+setTimeout(drawActivity,100);
+window.addEventListener('resize',drawActivity);
+
+// ============ THREE.JS GLOBE ============
+var G = (function(){
+  var canvas=document.getElementById('globeCanvas');
+  var renderer,scene,camera,globe,wire,dots,atm,stars,ambient,dirLight;
+  var rotSpeed=0.0025, dragging=false, lastX=0,lastY=0, rotVX=0,rotVY=0, autoRot=true;
+  var pulseT=0;
+
+  function init(){
+    var size=240;
+    renderer=new THREE.WebGLRenderer({canvas:canvas,alpha:true,antialias:true});
+    renderer.setSize(size,size,false);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+
+    scene=new THREE.Scene();
+    camera=new THREE.PerspectiveCamera(45,1,0.1,100);
+    camera.position.z=3.2;
+
+    ambient=new THREE.AmbientLight(0x2D1B4E,1.2); scene.add(ambient);
+    dirLight=new THREE.DirectionalLight(0x9D4EDD,1.8); dirLight.position.set(2,1.5,2); scene.add(dirLight);
+    var fill=new THREE.DirectionalLight(0xC77DFF,0.6); fill.position.set(-2,-1,1); scene.add(fill);
+
+    // Globe core (dark sphere)
+    var geo=new THREE.SphereGeometry(1,64,64);
+    var mat=new THREE.MeshPhongMaterial({color:0x1A0B2E,shininess:8,specular:0x4A2A7C,emissive:0x0D0015,emissiveIntensity:0.4});
+    globe=new THREE.Mesh(geo,mat); scene.add(globe);
+
+    // Wireframe (continents feel)
+    var wgeo=new THREE.SphereGeometry(1.002,48,48);
+    var wmat=new THREE.MeshBasicMaterial({color:0x9D4EDD,wireframe:true,transparent:true,opacity:0.22});
+    wire=new THREE.Mesh(wgeo,wmat); globe.add(wire);
+
+    // Continent-ish dots on surface (denser clusters)
+    dots=new THREE.Group();
+    addLandmass();
+    globe.add(dots);
+
+    // Glowing city points
+    addCityPoints();
+
+    // Atmosphere (backside fresnel)
+    var ageo=new THREE.SphereGeometry(1.18,48,48);
+    var amat=new THREE.ShaderMaterial({
+      uniforms:{c:{value:0.6},p:{value:3.0},glowColor:{value:new THREE.Color(0xC77DFF)}},
+      vertexShader:'varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader:'uniform vec3 glowColor;uniform float c;uniform float p;varying vec3 vN;void main(){float intensity=pow(c-dot(vN,vec3(0.0,0.0,1.0)),p);gl_FragColor=vec4(glowColor,1.0)*intensity;}',
+      side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true
+    });
+    atm=new THREE.Mesh(ageo,amat); scene.add(atm);
+
+    // Stars
+    var sgeo=new THREE.BufferGeometry();
+    var N=600, pos=new Float32Array(N*3);
+    for(var i=0;i<N;i++){var r=20+Math.random()*30,th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1);pos[i*3]=r*Math.sin(ph)*Math.cos(th);pos[i*3+1]=r*Math.sin(ph)*Math.sin(th);pos[i*3+2]=r*Math.cos(ph);}
+    sgeo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    var smat=new THREE.PointsMaterial({color:0xffffff,size:0.12,transparent:true,opacity:0.7,sizeAttenuation:true});
+    stars=new THREE.Points(sgeo,smat); scene.add(stars);
+
+    // Drag
+    canvas.addEventListener('pointerdown',onDown);
+    canvas.addEventListener('pointermove',onMove);
+    canvas.addEventListener('pointerup',onUp);
+    canvas.addEventListener('pointerleave',onUp);
+
+    animate();
+  }
+
+  function addLandmass(){
+    // Scatter many small dots to simulate landmass texture
+    var landPoints=[
+      [0.3,0.5],[-0.4,0.6],[0.6,0.2],[-0.5,-0.3],[0.2,-0.6],[-0.2,0.7],[0.5,0.7],[-0.6,0.1],
+      [0.1,0.8],[-0.3,-0.5],[0.7,-0.2],[-0.7,-0.4],[0.0,0.3],[0.4,-0.4],[-0.1,-0.7]
+    ];
+    landPoints.forEach(function(c){
+      var lat=c[1]*Math.PI*0.5, lon=c[0]*Math.PI;
+      for(var k=0;k<40;k++){
+        var dl=lat+(Math.random()-0.5)*0.5, dlon=lon+(Math.random()-0.5)*0.5;
+        addDot(dl,dlon,0.008,0x9D4EDD,0.6);
+      }
+    });
+  }
+  function addDot(lat,lon,r,col,op){
+    var phi=lat, theta=lon;
+    var x=Math.cos(phi)*Math.cos(theta), y=Math.sin(phi), z=Math.cos(phi)*Math.sin(theta);
+    var g=new THREE.SphereGeometry(Math.max(r,0.001),6,6);
+    var m=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:op});
+    var mesh=new THREE.Mesh(g,m);
+    mesh.position.set(x*1.01,y*1.01,z*1.01);
+    dots.add(mesh);
+  }
+
+  var cityMeshes=[];
+  function addCityPoints(){
+    var cities=[[35.6,139.6],[40.7,-74.0],[51.5,-0.1],[1.35,103.8],[25.2,55.3],[-33.8,151.2],[37.5,127.0],[19.4,-99.1],[55.7,37.6],[28.6,77.2],[48.8,2.3],[-23.5,-46.6]];
+    cities.forEach(function(c){
+      var lat=c[0]*Math.PI/180, lon=c[1]*Math.PI/180;
+      var x=Math.cos(lat)*Math.cos(lon), y=Math.sin(lat), z=Math.cos(lat)*Math.sin(lon);
+      var g=new THREE.SphereGeometry(0.022,10,10);
+      var m=new THREE.MeshBasicMaterial({color:0xC77DFF,transparent:true,opacity:0.9});
+      var mesh=new THREE.Mesh(g,m);
+      mesh.position.set(x*1.02,y*1.02,z*1.02);
+      mesh.userData={base:0.9,phase:Math.random()*Math.PI*2};
+      globe.add(mesh); cityMeshes.push(mesh);
+      // glow halo
+      var hg=new THREE.SphereGeometry(0.05,10,10);
+      var hm=new THREE.MeshBasicMaterial({color:0xC77DFF,transparent:true,opacity:0.15});
+      var halo=new THREE.Mesh(hg,hm); halo.position.copy(mesh.position); globe.add(halo);
+      mesh.userData.halo=halo;
+    });
+  }
+
+  function onDown(e){dragging=true;lastX=e.clientX;lastY=e.clientY;autoRot=false;}
+  function onMove(e){
+    if(!dragging)return;
+    var dx=e.clientX-lastX, dy=e.clientY-lastY;
+    rotVY=dx*0.005; rotVX=dy*0.005;
+    globe.rotation.y+=rotVY; globe.rotation.x+=rotVX;
+    globe.rotation.x=Math.max(-1.2,Math.min(1.2,globe.rotation.x));
+    lastX=e.clientX; lastY=e.clientY;
+  }
+  function onUp(){dragging=false;autoRot=true;}
+
+  function animate(){
+    requestAnimationFrame(animate);
+    pulseT+=0.03;
+    if(autoRot){globe.rotation.y+=state.connected?rotSpeed*2.2:rotSpeed;}
+    atm.rotation.copy(globe.rotation);
+    stars.rotation.y+=0.0003;
+
+    // pulse city points
+    cityMeshes.forEach(function(m){
+      var p=0.6+Math.sin(pulseT+m.userData.phase)*0.4;
+      var boost=state.connected?1.4:1.0;
+      m.material.opacity=Math.min(1,m.userData.base*p*boost);
+      if(m.userData.halo) m.userData.halo.material.opacity=0.1*p*boost;
+    });
+    // wireframe subtle shimmer
+    wire.material.opacity=state.connected?0.32:0.22;
+    if(state.connected){ dirLight.intensity=2.2; } else { dirLight.intensity=1.8; }
+
+    renderer.render(scene,camera);
+  }
+
+  return {init:init};
+})();
+window.addEventListener('load',function(){ try{G.init();}catch(e){console.error('globe',e);} });
+</script>
+</body>
+</html>
