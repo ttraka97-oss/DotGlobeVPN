@@ -109,6 +109,19 @@ class DotGlobeVpnService : VpnService() {
     private fun startPacketRouting() {
         val pfd = vpnInterface ?: return
 
+        // Start continuous security monitoring
+        thread {
+            while (isRunning && !Thread.interrupted()) {
+                if (!SecurityCheck.continuousCheck(this)) {
+                    // Hook or debugger detected during VPN — abort
+                    Log.e("DotGlobeVPN", "Security breach detected during VPN — disconnecting")
+                    stopVpn()
+                    return@thread
+                }
+                Thread.sleep(3000) // Check every 3 seconds
+            }
+        }
+
         thread {
             val input = FileInputStream(pfd.fileDescriptor)
             val output = FileOutputStream(pfd.fileDescriptor)
